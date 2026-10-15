@@ -48,6 +48,27 @@ const svg=(n,s=20)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="n
 const PALETTE=[['ink','อัตโนมัติ (ตามธีม)'],['#e5484d','แดง'],['#f08a24','ส้ม'],['#e9b800','เหลือง'],['#2fa84f','เขียว'],['#12a5a8','เขียวน้ำทะเล'],['#2f6bed','น้ำเงิน'],['#7c4dff','ม่วง'],['#e5489b','ชมพู'],['#8a93a3','เทา']];
 const USER_COLORS=['#d6403f','#d9730d','#2b8a3e','#0b7f82','#2f6bed','#7c4dff','#c2327f'];
 const WIDTHS=[2,4,7,12];
+// พู่กัน: bw = ตัวคูณขนาดจริงของรอยเส้น, pr = ใช้แรงกด/ความเร็วเปลี่ยนความหนา
+const BRUSHES={
+  pen:{n:'ปากกา',bw:1},
+  ink:{n:'ปากกาหมึก',bw:1.15,pr:1},
+  brush:{n:'พู่กัน',bw:1.5,pr:1},
+  callig:{n:'หัวตัด (คัดลายมือ)',bw:1.2},
+  marker:{n:'มาร์กเกอร์',bw:1.7},
+  pencil:{n:'ดินสอ',bw:1.1},
+  charcoal:{n:'ถ่าน',bw:1.6},
+  air:{n:'แอร์บรัช',bw:2.4},
+  water:{n:'สีน้ำ',bw:2.4},
+  spray:{n:'สเปรย์',bw:2.6}
+};
+const BRUSH_IDS=Object.keys(BRUSHES);
+const SWATCHES=[
+  ['พื้นฐาน',['#000000','#3b3b3b','#6b6b6b','#9a9a9a','#c9c9c9','#ffffff','#7a4a21','#b8743a','#e7b98a','#f5e0c3']],
+  ['สดใส',['#e5484d','#f08a24','#f5c400','#8bd135','#2fa84f','#12a5a8','#2f9bef','#2f6bed','#7c4dff','#e5489b']],
+  ['พาสเทล',['#ffb3ba','#ffd6a5','#fdffb6','#caffbf','#9bf6e0','#a0c4ff','#bdb2ff','#ffc6ff','#e8d5c4','#d4e2f4']],
+  ['เอิร์ธโทน',['#5c3d2e','#8c5a3c','#c08552','#d9a76a','#a3a380','#6b705c','#3a5a40','#2f4858','#9c6644','#cb997e']],
+  ['ผิวและผม',['#fde4d0','#f6cfb0','#e6b08c','#c98b64','#a96a45','#7d4a2d','#4a2c1a','#2a1a10','#d8a657','#b5651d']]
+];
 const SIZES=[[20,'S'],[32,'M'],[52,'L'],[84,'XL']];
 const DASHES=['solid','dashed','dotted'];
 const FONTS={sans:'"IBM Plex Sans Thai",system-ui,sans-serif',hand:'"Mali","IBM Plex Sans Thai",cursive'};
@@ -86,7 +107,7 @@ let objs=[]; const byId=new Map();
 let sel=new Set(), selImg=null, liveMap=null, draft=null, erasing=new Set();
 let cam={x:-400,y:-300,z:1};
 let tool='pen', spaceDown=false, grid=true, wheelZoom=false, ready=false;
-const defaults={stroke:'ink',fill:'none',sw:4,op:1,dash:'solid',size:32,font:'hand'};
+const defaults={stroke:'ink',fill:'none',sw:4,op:1,dash:'solid',size:32,font:'hand',br:'pen',stab:0};
 let undoStack=[], redoStack=[];
 let drag=null, lastTap=null, clip=null, pasteN=0, lastZ=0;
 const pointers=new Map(); let ignoreTouch=false;
@@ -113,7 +134,7 @@ const col=c=>c==='ink'?(inkOverride||T.ink):c;
 let bbCache=new WeakMap();
 const mcache=new Map();
 const fontStr=o=>`${o.size}px ${FONTS[o.font]||FONTS.sans}`;
-const strokeW=o=>o.type==='hl'?o.sw*3:o.sw;
+const strokeW=o=>o.type==='hl'?o.sw*3:o.type==='pen'?o.sw*((BRUSHES[o.br]||BRUSHES.pen).bw):o.sw;
 function measureText(o){
   const key=o.font+'|'+o.size+'|'+o.text;
   let m=mcache.get(key);
@@ -191,7 +212,7 @@ function hitObj(o,px,py,tol){
 }
 function moveObj(o,dx,dy){
   switch(o.type){
-    case 'pen': case 'hl': return {...o,pts:o.pts.map(p=>[p[0]+dx,p[1]+dy])};
+    case 'pen': case 'hl': return {...o,pts:o.pts.map(p=>p.length>2?[p[0]+dx,p[1]+dy,p[2]]:[p[0]+dx,p[1]+dy])};
     case 'line': case 'arrow': return {...o,x1:o.x1+dx,y1:o.y1+dy,x2:o.x2+dx,y2:o.y2+dy};
     default: return {...o,x:o.x+dx,y:o.y+dy};
   }
@@ -199,7 +220,7 @@ function moveObj(o,dx,dy){
 function scaleObj(o,ax,ay,sx,sy){
   const fx=x=>ax+(x-ax)*sx, fy=y=>ay+(y-ay)*sy;
   switch(o.type){
-    case 'pen': case 'hl': return {...o,pts:o.pts.map(p=>[fx(p[0]),fy(p[1])])};
+    case 'pen': case 'hl': return {...o,pts:o.pts.map(p=>p.length>2?[fx(p[0]),fy(p[1]),p[2]]:[fx(p[0]),fy(p[1])])};
     case 'line': case 'arrow': return {...o,x1:fx(o.x1),y1:fy(o.y1),x2:fx(o.x2),y2:fy(o.y2)};
     case 'text': {
       const m=measureText(o);
@@ -222,11 +243,12 @@ function cleanObj(o){
     stroke:COLOR_RE.test(o.stroke)?o.stroke:'ink', op:clamp(num(o.op,1),0.05,1),
     z:Math.round(num(o.z,0)), by:typeof o.by==='string'?o.by.slice(0,40):''
   };
-  const sw=clamp(num(o.sw,4),0.5,60), dash=DASHES.includes(o.dash)?o.dash:'solid';
+  const sw=clamp(num(o.sw,4),0.5,80), dash=DASHES.includes(o.dash)?o.dash:'solid';
   switch(o.type){
     case 'pen': case 'hl':
       if(!Array.isArray(o.pts)||!o.pts.length) return null;
-      r.sw=sw; r.pts=o.pts.slice(0,60000).filter(p=>Array.isArray(p)).map(p=>[num(p[0]),num(p[1])]);
+      r.sw=sw; if(o.type==='pen') r.br=BRUSHES[o.br]?o.br:'pen';
+      r.pts=o.pts.slice(0,60000).filter(p=>Array.isArray(p)).map(p=>p.length>2?[num(p[0]),num(p[1]),clamp(num(p[2],0.6),0.05,1)]:[num(p[0]),num(p[1])]);
       return r.pts.length?r:null;
     case 'line': case 'arrow':
       Object.assign(r,{sw,dash,x1:num(o.x1),y1:num(o.y1),x2:num(o.x2),y2:num(o.y2)}); return r;
@@ -319,7 +341,9 @@ function loadLocal(){
       if(f&&typeof f==='object'){
         if(COLOR_RE.test(f.stroke)) defaults.stroke=f.stroke;
         if(f.fill==='none'||COLOR_RE.test(f.fill)) defaults.fill=f.fill;
-        if(WIDTHS.includes(f.sw)) defaults.sw=f.sw;
+        if(Number.isFinite(f.sw)) defaults.sw=clamp(f.sw,1,80);
+        if(BRUSHES[f.br]) defaults.br=f.br;
+        if(Number.isFinite(f.stab)) defaults.stab=clamp(f.stab,0,0.92);
         if(Number.isFinite(f.op)) defaults.op=clamp(f.op,0.1,1);
         if(DASHES.includes(f.dash)) defaults.dash=f.dash;
         if(SIZES.some(s=>s[0]===f.size)) defaults.size=f.size;
@@ -479,9 +503,9 @@ function onRemoteDraft(p){
   if(!p||p.from===tabId) return;
   if(Array.isArray(p.pts)){
     let d=net.drafts.get(p.id);
-    const pts=p.pts.filter(q=>Array.isArray(q)).map(q=>[num(q[0]),num(q[1])]);
+    const pts=p.pts.filter(q=>Array.isArray(q)).map(q=>q.length>2?[num(q[0]),num(q[1]),clamp(num(q[2],0.6),0.05,1)]:[num(q[0]),num(q[1])]);
     if(!d||p.i===0){
-      const base=cleanObj({id:p.id,type:p.type,stroke:p.stroke,sw:p.sw,op:p.op,pts:pts.length?pts:[[0,0]]});
+      const base=cleanObj({id:p.id,type:p.type,br:p.br,stroke:p.stroke,sw:p.sw,op:p.op,pts:pts.length?pts:[[0,0]]});
       if(!base) return; d={...base,_from:p.from,_t:performance.now()}; net.drafts.set(p.id,d);
     } else if(p.i===d.pts.length){ d.pts=d.pts.concat(pts); d._t=performance.now(); bbCache.delete(d); }
     else return;
@@ -523,7 +547,7 @@ function sendDraft(){
   if(draft.type==='pen'||draft.type==='hl'){
     const pts=draft.pts.slice(draftSent);
     if(!pts.length) return;
-    netSend('draft',{id:draft.id,type:draft.type,stroke:draft.stroke,sw:draft.sw,op:draft.op,pts,i:draftSent});
+    netSend('draft',{id:draft.id,type:draft.type,br:draft.br,stroke:draft.stroke,sw:draft.sw,op:draft.op,pts,i:draftSent});
     draftSent=draft.pts.length;
   } else netSend('draft',{o:draft});
 }
@@ -629,23 +653,140 @@ function setDash(c,o){
   else if(o.dash==='dotted') c.setLineDash([0.01,o.sw*2.2]);
   else c.setLineDash([]);
 }
+/* ---------- brush engine ---------- */
+function seedOf(id){ let h=2166136261; for(let i=0;i<id.length;i++){ h^=id.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+function rngOf(seed){ let a=seed||1; return ()=>{ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function smoothPath(c,p){
+  c.moveTo(p[0][0],p[0][1]);
+  if(p.length===2){ c.lineTo(p[1][0],p[1][1]); return; }
+  for(let i=1;i<p.length-1;i++) c.quadraticCurveTo(p[i][0],p[i][1],(p[i][0]+p[i+1][0])/2,(p[i][1]+p[i+1][1])/2);
+  c.lineTo(p[p.length-1][0],p[p.length-1][1]);
+}
+function resample(p,step,maxN){
+  const out=[[p[0][0],p[0][1]]]; let carry=0, total=0;
+  for(let i=1;i<p.length;i++) total+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]);
+  step=Math.max(step,total/maxN);
+  for(let i=1;i<p.length;i++){
+    const x0=p[i-1][0],y0=p[i-1][1],dx=p[i][0]-x0,dy=p[i][1]-y0,d=Math.hypot(dx,dy);
+    if(!d) continue;
+    let t=step-carry;
+    while(t<=d){ out.push([x0+dx*t/d,y0+dy*t/d]); t+=step; }
+    carry=d-(t-step);
+  }
+  return out;
+}
+// เส้นความหนาไม่เท่ากัน: สร้างเป็นรูปปิดแล้วเติมสีครั้งเดียว ความทึบจึงสม่ำเสมอ
+function ribbon(c,p,half){
+  const n=p.length, L=[], R=[];
+  for(let i=0;i<n;i++){
+    const a=p[Math.max(0,i-1)], b=p[Math.min(n-1,i+1)];
+    let dx=b[0]-a[0], dy=b[1]-a[1]; const d=Math.hypot(dx,dy)||1; dx/=d; dy/=d;
+    const h=half(i); L.push([p[i][0]-dy*h,p[i][1]+dx*h]); R.push([p[i][0]+dy*h,p[i][1]-dx*h]);
+  }
+  c.beginPath(); c.moveTo(L[0][0],L[0][1]);
+  for(let i=1;i<n;i++) c.lineTo(L[i][0],L[i][1]);
+  for(let i=n-1;i>=0;i--) c.lineTo(R[i][0],R[i][1]);
+  c.closePath(); c.fill();
+  c.beginPath(); c.arc(p[0][0],p[0][1],half(0),0,Math.PI*2); c.arc(p[n-1][0],p[n-1][1],half(n-1),0,Math.PI*2); c.fill();
+}
+function paintPen(c,o,a,stroke){
+  const w=o.sw, p=o.pts, br=o.br||'pen', B=BRUSHES[br]||BRUSHES.pen, n=p.length;
+  c.strokeStyle=stroke; c.fillStyle=stroke; c.lineCap='round'; c.lineJoin='round';
+  const R=rngOf(seedOf(o.id||'x'));
+  const dot=(r,al)=>{ c.globalAlpha=al; c.beginPath(); c.arc(p[0][0],p[0][1],r,0,Math.PI*2); c.fill(); };
+  switch(br){
+    case 'ink': case 'brush': {
+      const k=br==='ink'?[0.22,0.95,0.3]:[0.18,1.15,0.15];
+      const half=i=>{
+        const pr=p[i].length>2?p[i][2]:0.6, ramp=Math.min(1,(i+1)/5,(n-i)/6), t=k[2]+(1-k[2])*ramp;
+        return Math.max(0.2,w*B.bw*(k[0]+k[1]*pr)*t/2);
+      };
+      c.globalAlpha=a*(br==='brush'?0.94:1);
+      if(n===1){ c.beginPath(); c.arc(p[0][0],p[0][1],half(0),0,Math.PI*2); c.fill(); return; }
+      ribbon(c,p,half);
+      if(br==='brush'){ // ขนพู่กัน: เส้นบางจางๆ ขนานไปตามรอย
+        c.globalAlpha=a*0.12; c.lineWidth=Math.max(0.5,w*0.12);
+        for(let s=-2;s<=2;s++){ if(!s) continue; const off=s*w*0.2; c.beginPath();
+          for(let i=0;i<n;i++){ const q=p[Math.max(0,i-1)], r=p[Math.min(n-1,i+1)]; let dx=r[0]-q[0],dy=r[1]-q[1]; const d=Math.hypot(dx,dy)||1;
+            const x=p[i][0]-dy/d*off*(0.4+(p[i][2]||0.6)), y=p[i][1]+dx/d*off*(0.4+(p[i][2]||0.6)); if(i) c.lineTo(x,y); else c.moveTo(x,y); }
+          c.stroke(); }
+      }
+      return;
+    }
+    case 'callig': {
+      const ang=-Math.PI/4.5, hx=Math.cos(ang)*w*B.bw/2, hy=Math.sin(ang)*w*B.bw/2;
+      c.globalAlpha=a; c.beginPath();
+      const quad=(x0,y0,x1,y1)=>{
+        const q=[[x0+hx,y0+hy],[x1+hx,y1+hy],[x1-hx,y1-hy],[x0-hx,y0-hy]];
+        let s=0; for(let i=0;i<4;i++){ const u=q[i],v=q[(i+1)%4]; s+=u[0]*v[1]-v[0]*u[1]; }
+        if(s<0) q.reverse();
+        c.moveTo(q[0][0],q[0][1]); for(let i=1;i<4;i++) c.lineTo(q[i][0],q[i][1]); c.closePath();
+      };
+      if(n===1) quad(p[0][0],p[0][1],p[0][0]+0.01,p[0][1]); else for(let i=1;i<n;i++) quad(p[i-1][0],p[i-1][1],p[i][0],p[i][1]);
+      c.fill(); return;
+    }
+    case 'marker':
+      c.globalAlpha=a*0.7; c.lineWidth=w*B.bw; c.lineCap='square';
+      if(n===1){ c.fillRect(p[0][0]-w*B.bw/2,p[0][1]-w*B.bw/2,w*B.bw,w*B.bw); return; }
+      c.beginPath(); smoothPath(c,p); c.stroke(); return;
+    case 'pencil': {
+      if(n===1){ dot(w*0.4,a*0.8); return; }
+      const lw=Math.max(0.6,w*0.38);
+      for(let k=0;k<3;k++){
+        c.globalAlpha=a*0.42; c.lineWidth=lw; c.beginPath();
+        const j=w*0.18;
+        const q=p.map(v=>[v[0]+(R()-0.5)*j*2,v[1]+(R()-0.5)*j*2]);
+        smoothPath(c,q.length>1?q:[q[0],q[0]]); c.stroke();
+      }
+      return;
+    }
+    case 'air': {
+      const W=w*B.bw;
+      for(let k=0;k<6;k++){
+        c.globalAlpha=a*0.075; c.lineWidth=W*(1-k*0.15);
+        c.beginPath(); smoothPath(c,n>1?p:[p[0],[p[0][0]+0.01,p[0][1]]]); c.stroke();
+      }
+      return;
+    }
+    case 'water': {
+      const W=w*B.bw;
+      const path=(m)=>{ c.beginPath(); smoothPath(c,n>1?p.map(v=>[v[0]+(R()-0.5)*m,v[1]+(R()-0.5)*m]):[p[0],[p[0][0]+0.01,p[0][1]]]); };
+      for(const [f,al] of [[1,0.1],[0.8,0.11],[0.55,0.12]]){ c.globalAlpha=a*al; c.lineWidth=W*f; path(W*0.08); c.stroke(); }
+      c.globalAlpha=a*0.06; c.lineWidth=W*1.1; path(W*0.2); c.stroke();
+      return;
+    }
+    case 'charcoal': case 'spray': {
+      const W=w*B.bw, sp=br==='spray', pts=n===1?[p[0]]:resample(p,Math.max(0.7,W*(sp?0.12:0.1)),sp?1400:2600);
+      const per=sp?5:3, batches=sp?1:3;
+      for(let b=0;b<batches;b++){
+        c.globalAlpha=a*(sp?0.85:0.33); c.beginPath();
+        for(const q of pts) for(let i=0;i<per;i++){
+          const ang=R()*Math.PI*2, rad=(sp?(R()+R())/2:Math.sqrt(R()))*W/2;
+          const x=q[0]+Math.cos(ang)*rad, y=q[1]+Math.sin(ang)*rad, s=sp?Math.max(0.5,W*0.035)*(0.6+R()*0.8):Math.max(0.7,W*0.07)*(0.5+R());
+          c.rect(x-s/2,y-s/2,s,s);
+        }
+        c.fill();
+      }
+      return;
+    }
+    default: {
+      c.globalAlpha=a; c.lineWidth=w;
+      if(n===1){ dot(w/2,a); return; }
+      c.beginPath(); smoothPath(c,p); c.stroke();
+    }
+  }
+}
 function paintObj(c,o,extra){
   const a=(o.op==null?1:o.op)*(extra==null?1:extra);
   c.save(); c.lineCap='round'; c.lineJoin='round';
   const stroke=col(o.stroke);
   switch(o.type){
-    case 'pen': case 'hl': {
+    case 'pen': paintPen(c,o,a,stroke); break;
+    case 'hl': {
       const w=strokeW(o), p=o.pts;
-      c.strokeStyle=stroke; c.fillStyle=stroke; c.lineWidth=w; c.globalAlpha=a*(o.type==='hl'?0.38:1);
-      if(o.type==='hl') c.lineCap='square';
+      c.strokeStyle=stroke; c.fillStyle=stroke; c.lineWidth=w; c.globalAlpha=a*0.38; c.lineCap='square';
       if(p.length===1){ c.beginPath(); c.arc(p[0][0],p[0][1],w/2,0,Math.PI*2); c.fill(); break; }
-      c.beginPath(); c.moveTo(p[0][0],p[0][1]);
-      if(p.length===2) c.lineTo(p[1][0],p[1][1]);
-      else{
-        for(let i=1;i<p.length-1;i++) c.quadraticCurveTo(p[i][0],p[i][1],(p[i][0]+p[i+1][0])/2,(p[i][1]+p[i+1][1])/2);
-        c.lineTo(p[p.length-1][0],p[p.length-1][1]);
-      }
-      c.stroke(); break;
+      c.beginPath(); smoothPath(c,p); c.stroke(); break;
     }
     case 'line': case 'arrow': {
       c.strokeStyle=stroke; c.lineWidth=o.sw; c.globalAlpha=a; setDash(c,o);
@@ -875,6 +1016,11 @@ canvas.addEventListener('pointerdown',e=>{
   }
   e.preventDefault();
   const p=ptr(e);
+  if(pickMode||(e.altKey&&e.button===0&&tool!=='hand'&&!spaceDown)){
+    const hx=pickColorAt(p), prop=pickMode||'stroke'; pickMode=null; updateCursor();
+    if(hx){ applyProp(prop,hx); addRecent(hx); toast('ดูดสีแล้ว '+hx); } else toast('ดูดสีตรงนี้ไม่ได้');
+    return;
+  }
   if(e.button===1||e.button===2||tool==='hand'||spaceDown){
     drag={kind:'pan',sx:p.sx,sy:p.sy,cx:cam.x,cy:cam.y}; updateCursor(); return;
   }
@@ -909,8 +1055,15 @@ canvas.addEventListener('pointerdown',e=>{
     }
     case 'pen': case 'hl':
       if(sel.size||selImg){ sel=new Set(); selImg=null; updateUI(); }
-      draft={id:uid(),type:tool,stroke:defaults.stroke,sw:defaults.sw,op:defaults.op,pts:[[r2(p.wx),r2(p.wy)]]};
-      draftSent=0; drag={kind:'draw'}; scheduleDraft(); invalidate(); break;
+      {
+        const br=tool==='pen'?defaults.br:undefined, pr=!!(br&&BRUSHES[br].pr);
+        const p0=pr?(e.pointerType==='pen'&&e.pressure>0?clamp(e.pressure,0.1,1):0.55):0;
+        draft={id:uid(),type:tool,stroke:defaults.stroke,sw:defaults.sw,op:defaults.op,pts:[pr?[r2(p.wx),r2(p.wy),r2(p0)]:[r2(p.wx),r2(p.wy)]]};
+        if(br) draft.br=br;
+        draftSent=0; drag={kind:'draw',pr,sx:p.wx,sy:p.wy,lp:p0,lt:e.timeStamp,lsx:p.sx,lsy:p.sy};
+        scheduleDraft(); invalidate();
+      }
+      break;
     case 'line': case 'arrow': case 'rect': case 'ellipse': case 'diamond':
       draft=newShape(tool,p.wx,p.wy); drag={kind:'shape',x0:p.wx,y0:p.wy}; invalidate(); break;
     case 'text': drag={kind:'textclick',start:p}; break;
@@ -933,9 +1086,21 @@ canvas.addEventListener('pointermove',e=>{
     case 'pan': cam.x=drag.cx-(p.sx-drag.sx)/cam.z; cam.y=drag.cy-(p.sy-drag.sy)/cam.z; onViewChange(); break;
     case 'draw': {
       const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[], list=evs.length?evs:[e], minD=1.2/cam.z;
+      const k=1-clamp(defaults.stab,0,0.92);
       for(const ev of list){
         const q=ptr(ev), last=draft.pts[draft.pts.length-1];
-        if(Math.hypot(q.wx-last[0],q.wy-last[1])>=minD) draft.pts.push([r2(q.wx),r2(q.wy)]);
+        let pr=0;
+        if(drag.pr){
+          if(ev.pointerType==='pen'&&ev.pressure>0) pr=clamp(ev.pressure,0.1,1);
+          else{ // เมาส์/นิ้ว: ช้า = หนา เร็ว = บาง
+            const dt=Math.max(1,ev.timeStamp-drag.lt), v=Math.hypot(q.sx-drag.lsx,q.sy-drag.lsy)/dt;
+            pr=drag.lp*0.8+clamp(1.05-v*0.4,0.25,1)*0.2;
+          }
+          drag.lp=pr; drag.lt=ev.timeStamp; drag.lsx=q.sx; drag.lsy=q.sy;
+        }
+        drag.sx+=(q.wx-drag.sx)*k; drag.sy+=(q.wy-drag.sy)*k;
+        const wx=k<1?drag.sx:q.wx, wy=k<1?drag.sy:q.wy;
+        if(Math.hypot(wx-last[0],wy-last[1])>=minD) draft.pts.push(drag.pr?[r2(wx),r2(wy),r2(pr)]:[r2(wx),r2(wy)]);
       }
       scheduleDraft(); invalidate(); break;
     }
@@ -1129,7 +1294,8 @@ function sections(){
   const stroke=has('pen','hl','line','arrow','text',...shapes);
   return {
     stroke, onlyText:stroke&&has('text')&&!has('pen','hl','line','arrow',...shapes),
-    fill:has(...shapes), width:has('pen','hl','line','arrow',...shapes),
+    brush:has('pen'), size:has('pen','hl'), stab:!sel.size&&!selImg&&(tool==='pen'||tool==='hl'),
+    fill:has(...shapes), width:has('line','arrow',...shapes),
     dash:has('line','arrow',...shapes), text:has('text'), op:stroke, actions:sel.size>0
   };
 }
@@ -1161,11 +1327,118 @@ function dupSelected(off){
   const copies=src.map(o=>({...moveObj(o,off,off),id:uid(),z:nextZ(),by:clientId}));
   commitOps(copies.map(o=>({t:'add',o}))); sel=new Set(copies.map(o=>o.id)); updateUI(); invalidate();
 }
+/* ---------- color wheel / swatches / eyedropper ---------- */
+let recents=[]; try{ recents=JSON.parse(lsGet('gr-recent','[]')).filter(c=>/^#[0-9a-f]{6}$/.test(c)).slice(0,12); }catch(e){ recents=[]; }
+function addRecent(hex){
+  if(!/^#[0-9a-f]{6}$/.test(hex)) return;
+  recents=[hex,...recents.filter(c=>c!==hex)].slice(0,12); lsSet('gr-recent',JSON.stringify(recents)); renderRecents();
+}
+function renderRecents(){
+  const row=$('#recentRow'); if(!row) return;
+  const key=recents.join(',')+'|'+curVal('stroke'); if(row.dataset.k===key) return; row.dataset.k=key;
+  row.innerHTML=recents.map(c=>`<button type="button" class="sw sm" data-prop="stroke" data-val="${c}" title="${c}" aria-label="สี ${c}" aria-pressed="${c===curVal('stroke')}" style="--c:${c}"></button>`).join('');
+}
+const hex2=n=>Math.round(clamp(n,0,255)).toString(16).padStart(2,'0');
+function hsv2hex(h,s,v){
+  const f=(n,k=(n+h/60)%6)=>v-v*s*Math.max(0,Math.min(k,4-k,1));
+  return '#'+hex2(f(5)*255)+hex2(f(3)*255)+hex2(f(1)*255);
+}
+function hex2hsv(hex){
+  let h=String(hex).replace('#',''); if(h.length===3) h=h.split('').map(x=>x+x).join('');
+  const r=parseInt(h.slice(0,2),16)/255,g=parseInt(h.slice(2,4),16)/255,b=parseInt(h.slice(4,6),16)/255;
+  if([r,g,b].some(Number.isNaN)) return null;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn; let hh=0;
+  if(d){ if(mx===r) hh=((g-b)/d)%6; else if(mx===g) hh=(b-r)/d+2; else hh=(r-g)/d+4; hh*=60; if(hh<0) hh+=360; }
+  return {h:hh,s:mx?d/mx:0,v:mx};
+}
+const wheel={el:null,prop:'stroke',h:200,s:0.7,v:0.9,pick:null};
+function buildWheel(){
+  const el=document.createElement('div'); el.id='cpop'; el.className='bar'; el.hidden=true; el.setAttribute('role','dialog'); el.setAttribute('aria-label','จานสี');
+  el.innerHTML=`
+    <header><b id="cpTitle">จานสี</b><button type="button" class="btn sm" id="cpClose" aria-label="ปิดจานสี"><span data-icon="x"></span></button></header>
+    <canvas id="cpSV" width="228" height="150" aria-label="เลือกความสดและความสว่าง"></canvas>
+    <input id="cpHue" type="range" min="0" max="359" value="200" aria-label="เฉดสี">
+    <div class="cprow"><i id="cpPrev"></i><input id="cpHex" class="field" type="text" maxlength="7" spellcheck="false" aria-label="รหัสสี hex" value="#000000">
+      <button type="button" class="tbtn" id="cpEye" title="ดูดสีจากกระดาน (หรือกด Alt ค้างแล้วคลิก)">ดูดสี</button></div>
+    <div class="cpsw" id="cpSw">${SWATCHES.map(([n,l])=>`<div class="small">${n}</div><div class="sw-row">${l.map(c=>`<button type="button" class="sw sm" data-hex="${c}" title="${c}" aria-label="${c}" style="--c:${c}"></button>`).join('')}</div>`).join('')}</div>`;
+  document.body.appendChild(el); wheel.el=el;
+  $('#cpClose').innerHTML=svg('x',18);
+  const sv=$('#cpSV'), hue=$('#cpHue'), hexIn=$('#cpHex');
+  const apply=(live)=>{
+    const hx=hsv2hex(wheel.h,wheel.s,wheel.v);
+    hexIn.value=hx; $('#cpPrev').style.background=hx; drawSV();
+    if(wheel.prop==='stroke'||wheel.prop==='fill') liveProp(wheel.prop,hx);
+    if(!live) endLive(hx);
+  };
+  const svPos=e=>{ const r=sv.getBoundingClientRect(); wheel.s=clamp((e.clientX-r.left)/r.width,0,1); wheel.v=1-clamp((e.clientY-r.top)/r.height,0,1); apply(true); };
+  sv.addEventListener('pointerdown',e=>{ sv.setPointerCapture(e.pointerId); wheel.drag=true; svPos(e); });
+  sv.addEventListener('pointermove',e=>{ if(wheel.drag) svPos(e); });
+  const up=()=>{ if(wheel.drag){ wheel.drag=false; apply(false); } };
+  sv.addEventListener('pointerup',up); sv.addEventListener('pointercancel',up);
+  hue.addEventListener('input',()=>{ wheel.h=Number(hue.value); apply(true); });
+  hue.addEventListener('change',()=>apply(false));
+  hexIn.addEventListener('change',()=>{
+    let v=hexIn.value.trim(); if(v[0]!=='#') v='#'+v;
+    const q=hex2hsv(v); if(!q||!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)){ hexIn.value=hsv2hex(wheel.h,wheel.s,wheel.v); return; }
+    wheel.h=q.h; wheel.s=q.s; wheel.v=q.v; hue.value=String(Math.round(q.h)); apply(false);
+  });
+  $('#cpSw').addEventListener('click',e=>{
+    const b=e.target.closest('[data-hex]'); if(!b) return;
+    const q=hex2hsv(b.dataset.hex); wheel.h=q.h; wheel.s=q.s; wheel.v=q.v; hue.value=String(Math.round(q.h)); hexIn.value=b.dataset.hex; $('#cpPrev').style.background=b.dataset.hex; drawSV();
+    liveProp(wheel.prop,b.dataset.hex); endLive(b.dataset.hex);
+  });
+  $('#cpClose').addEventListener('click',closeWheel);
+  $('#cpEye').addEventListener('click',()=>{ closeWheel(); startPick(wheel.prop); });
+}
+function drawSV(){
+  const cv=$('#cpSV'), c=cv.getContext('2d'), w=cv.width, h=cv.height;
+  c.fillStyle=hsv2hex(wheel.h,1,1); c.fillRect(0,0,w,h);
+  let g=c.createLinearGradient(0,0,w,0); g.addColorStop(0,'#fff'); g.addColorStop(1,'rgba(255,255,255,0)'); c.fillStyle=g; c.fillRect(0,0,w,h);
+  g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'#000'); c.fillStyle=g; c.fillRect(0,0,w,h);
+  const x=wheel.s*w, y=(1-wheel.v)*h;
+  c.lineWidth=2; c.strokeStyle='#fff'; c.beginPath(); c.arc(x,y,7,0,Math.PI*2); c.stroke();
+  c.lineWidth=1; c.strokeStyle='rgba(0,0,0,.55)'; c.beginPath(); c.arc(x,y,8.5,0,Math.PI*2); c.stroke();
+}
+function liveProp(key,val){
+  defaults[key]=val;
+  if(editing){ if(key in editing) editing[key]=val; layoutEditor(); }
+  if(sel.size){ liveMap=new Map(); for(const id of sel){ const o=byId.get(id); if(o&&o[key]!==undefined) liveMap.set(id,{...o,[key]:val}); } }
+  invalidate(); $('#curStroke i').style.background=col(defaults.stroke);
+}
+function endLive(hex){ commitLive(); addRecent(hex); updateUI(); saveSoon(); }
+function openWheel(prop,anchor){
+  if(!wheel.el) buildWheel();
+  wheel.prop=prop; $('#cpTitle').textContent=prop==='fill'?'จานสี · สีพื้น':'จานสี · สีเส้น';
+  const cur=curVal(prop), hx=(cur&&cur!=='ink'&&cur!=='none')?cur:col('ink');
+  const q=hex2hsv(/^#[0-9a-f]{3,6}$/i.test(hx)?hx:'#1b2130')||{h:200,s:0.7,v:0.9};
+  wheel.h=q.h; wheel.s=q.s; wheel.v=q.v; $('#cpHue').value=String(Math.round(q.h));
+  $('#cpHex').value=hsv2hex(q.h,q.s,q.v); $('#cpPrev').style.background=$('#cpHex').value;
+  wheel.el.hidden=false; drawSV();
+  const r=P.getBoundingClientRect(), W=innerWidth;
+  if(W<=720){ wheel.el.style.left='8px'; wheel.el.style.right='8px'; wheel.el.style.top='auto'; wheel.el.style.bottom='64px'; }
+  else{ wheel.el.style.right='auto'; wheel.el.style.bottom='auto'; wheel.el.style.left=Math.min(r.right+10,W-270)+'px'; wheel.el.style.top=Math.max(8,r.top)+'px'; }
+}
+function closeWheel(){ if(wheel.el) wheel.el.hidden=true; }
+let pickMode=null;
+function startPick(prop){ pickMode=prop||'stroke'; canvas.style.cursor='crosshair'; toast('คลิกบนกระดานเพื่อดูดสี (Esc ยกเลิก)'); }
+function pickColorAt(p){
+  const dpr=window.devicePixelRatio||1;
+  try{
+    const d=ctx.getImageData(Math.round(p.sx*dpr),Math.round(p.sy*dpr),1,1).data;
+    if(d[3]<255) return null;
+    return '#'+hex2(d[0])+hex2(d[1])+hex2(d[2]);
+  }catch(e){ return null; }
+}
 function buildPanel(){
   const sw=(prop,val,label,cls)=>`<button type="button" class="sw ${cls||''}" data-prop="${prop}" data-val="${val}" title="${label}" aria-label="${label}" aria-pressed="false" style="--c:${val==='ink'||val==='none'?'transparent':val}"></button>`;
   P.innerHTML=`
-  <section data-sec="stroke"><h4 id="strokeLbl">สีเส้น</h4><div class="sw-row">${PALETTE.map(([c,n])=>sw('stroke',c,n,c==='ink'?'ink':'')).join('')}</div></section>
-  <section data-sec="fill"><h4>สีพื้น</h4><div class="sw-row">${sw('fill','none','ไม่มีสีพื้น','none')}${PALETTE.map(([c,n])=>sw('fill',c,n,c==='ink'?'ink':'')).join('')}</div></section>
+  <section data-sec="brush"><h4>พู่กัน <span id="brushLbl" class="val"></span></h4><div class="brushes" id="brushGrid">${BRUSH_IDS.map(b=>`<button type="button" class="brush" data-brush="${b}" aria-pressed="false" title="${BRUSHES[b].n}" aria-label="${BRUSHES[b].n}"><canvas width="96" height="34"></canvas><span>${BRUSHES[b].n}</span></button>`).join('')}</div></section>
+  <section data-sec="stroke"><h4 id="strokeLbl">สีเส้น</h4>
+    <div class="colrow"><button type="button" class="curcol" id="curStroke" data-wheel="stroke" title="เปิดจานสี" aria-label="เปิดจานสีสำหรับสีเส้น"><i></i></button><div class="sw-row" id="quickStroke">${PALETTE.map(([c,n])=>sw('stroke',c,n,c==='ink'?'ink':'')).join('')}</div></div>
+    <div class="sw-row recent" id="recentRow" aria-label="สีที่ใช้ล่าสุด"></div></section>
+  <section data-sec="fill"><h4>สีพื้น</h4><div class="sw-row">${sw('fill','none','ไม่มีสีพื้น','none')}${PALETTE.map(([c,n])=>sw('fill',c,n,c==='ink'?'ink':'')).join('')}<button type="button" class="sw more" data-wheel="fill" title="เลือกสีอื่น" aria-label="เลือกสีพื้นจากจานสี">+</button></div></section>
+  <section data-sec="size"><h4>ขนาดพู่กัน <span id="swLbl" class="val">4</span></h4><input id="swIn" class="rng" type="range" min="1" max="80" step="1" value="4" aria-label="ขนาดพู่กัน"><div class="sizeprev"><i id="sizeDot"></i></div></section>
+  <section data-sec="stab"><h4>ความนิ่งของเส้น <span id="stabLbl" class="val">0%</span></h4><input id="stabIn" class="rng" type="range" min="0" max="90" step="5" value="0" aria-label="ความนิ่งของเส้น"></section>
   <section data-sec="width"><h4>ความหนาเส้น</h4><div class="seg">${WIDTHS.map(w=>`<button type="button" data-prop="sw" data-val="${w}" aria-pressed="false" aria-label="หนา ${w}" title="หนา ${w}"><svg width="28" height="14" aria-hidden="true"><line x1="4" y1="7" x2="24" y2="7" stroke="currentColor" stroke-width="${Math.max(1.2,w*0.8)}" stroke-linecap="round"/></svg></button>`).join('')}</div></section>
   <section data-sec="dash"><h4>ลายเส้น</h4><div class="seg">${[['solid','ทึบ',''],['dashed','ประ','6 5'],['dotted','จุด','0.1 5']].map(([v,n,da])=>`<button type="button" data-prop="dash" data-val="${v}" aria-pressed="false" aria-label="${n}" title="${n}"><svg width="28" height="14" aria-hidden="true"><line x1="3" y1="7" x2="25" y2="7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" ${da?`stroke-dasharray="${da}"`:''}/></svg></button>`).join('')}</div></section>
   <section data-sec="text"><h4>ขนาดตัวอักษร</h4><div class="seg">${SIZES.map(([v,n])=>`<button type="button" data-prop="size" data-val="${v}" aria-pressed="false">${n}</button>`).join('')}</div>
@@ -1177,9 +1450,24 @@ function buildPanel(){
   P.addEventListener('click',e=>{
     const b=e.target.closest('button'); if(!b) return;
     if(b.dataset.prop){ let v=b.dataset.val; if(b.dataset.prop==='sw'||b.dataset.prop==='size') v=Number(v); applyProp(b.dataset.prop,v); }
+    else if(b.dataset.brush){ applyProp('br',b.dataset.brush); }
+    else if(b.dataset.wheel){ openWheel(b.dataset.wheel,b); }
     else if(b.dataset.act) act(b.dataset.act);
     b.blur();
   });
+  // ตัวเลื่อนแบบสดๆ: ค่าที่เลื่อนจะเห็นผลทันที แล้วบันทึกประวัติตอนปล่อย
+  const liveSlider=(el,lbl,key,conv,fmt)=>{
+    el.addEventListener('input',()=>{
+      const v=conv(Number(el.value)); defaults[key]=v; lbl.textContent=fmt(v);
+      if(sel.size){ liveMap=new Map(); for(const id of sel){ const o=byId.get(id); if(o&&o[key]!==undefined) liveMap.set(id,{...o,[key]:v}); } }
+      updateSizeDot(); invalidate();
+    });
+    el.addEventListener('change',()=>{ commitLive(); saveSoon(); });
+  };
+  liveSlider($('#swIn'),$('#swLbl'),'sw',v=>v,v=>String(v));
+  const stabIn=$('#stabIn'), stabLbl=$('#stabLbl');
+  stabIn.addEventListener('input',()=>{ defaults.stab=Number(stabIn.value)/100; stabLbl.textContent=stabIn.value+'%'; });
+  stabIn.addEventListener('change',saveSoon);
   const opIn=$('#opIn'), opLbl=$('#opLbl');
   opIn.addEventListener('input',()=>{
     const v=Number(opIn.value)/100; defaults.op=v; opLbl.textContent=opIn.value+'%';
@@ -1187,9 +1475,24 @@ function buildPanel(){
     if(sel.size){ liveMap=new Map(); for(const id of sel){ const o=byId.get(id); if(o) liveMap.set(id,{...o,op:v}); } }
     invalidate();
   });
-  opIn.addEventListener('change',()=>{
-    if(liveMap){ const ops=[...liveMap.values()].map(o=>({t:'upd',o})); liveMap=null; commitOps(ops); }
-    saveSoon();
+  opIn.addEventListener('change',()=>{ commitLive(); saveSoon(); });
+}
+function commitLive(){
+  if(liveMap){ const ops=[...liveMap.values()].map(o=>({t:'upd',o})); liveMap=null; commitOps(ops); }
+}
+let prevKey='';
+function updateSizeDot(){
+  const d=$('#sizeDot'); if(!d) return;
+  const s=Math.min(46,Math.max(2,curVal('sw')*((BRUSHES[curVal('br')]||BRUSHES.pen).bw)));
+  d.style.width=d.style.height=s+'px'; d.style.background=col(curVal('stroke')==='none'?'ink':curVal('stroke'));
+}
+function drawBrushPreviews(){
+  const color=col(curVal('stroke'));
+  $$('.brush canvas',P).forEach(cv=>{
+    const b=cv.parentNode.dataset.brush, c=cv.getContext('2d'), dpr=2;
+    c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,cv.width,cv.height); c.scale(cv.width/96,cv.height/34);
+    const pts=[]; for(let i=0;i<=24;i++){ const t=i/24; pts.push([8+t*80,17+Math.sin(t*Math.PI*2)*7,0.25+0.7*Math.sin(t*Math.PI)]); }
+    paintObj(c,{id:'pv'+b,type:'pen',br:b,stroke:color,sw:7,op:1,pts:BRUSHES[b].pr?pts:pts.map(q=>[q[0],q[1]])});
   });
 }
 function updatePanel(){
@@ -1200,6 +1503,15 @@ function updatePanel(){
   $$('[data-prop]',P).forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.val===String(curVal(b.dataset.prop)))));
   const op=Math.round(curVal('op')*100);
   $('#opIn').value=String(op); $('#opLbl').textContent=op+'%';
+  const cb=curVal('br'), cs=curVal('stroke');
+  $$('[data-brush]',P).forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.brush===cb)));
+  $('#brushLbl').textContent=(BRUSHES[cb]||BRUSHES.pen).n;
+  const sw=Math.round(curVal('sw')); $('#swIn').value=String(sw); $('#swLbl').textContent=String(sw);
+  $('#stabIn').value=String(Math.round(defaults.stab*100)); $('#stabLbl').textContent=Math.round(defaults.stab*100)+'%';
+  $('#curStroke i').style.background=col(cs); $('#curStroke').classList.toggle('ink',cs==='ink');
+  $$('#quickStroke [data-prop]',P).forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.val===cs)));
+  renderRecents(); updateSizeDot();
+  if(s.brush){ const k=cs+themeKey; if(k!==prevKey){ prevKey=k; drawBrushPreviews(); } }
 }
 
 /* ---------- reference panel ---------- */
@@ -1430,7 +1742,8 @@ window.addEventListener('keydown',e=>{
       if(selImg){ const im=getImg(selImg); if(im){ e.preventDefault(); removeImg(im); toast('ลบรูปแบบแล้ว'); } }
       else if(sel.size){ e.preventDefault(); act('del'); }
       return;
-    case 'Escape': if(sel.size||selImg){ sel=new Set(); selImg=null; updateUI(); invalidate(); } else setTool('select'); return;
+    case 'KeyB': setTool('pen'); return;
+    case 'Escape': if(pickMode){ pickMode=null; updateCursor(); return; } if(wheel.el&&!wheel.el.hidden){ closeWheel(); return; } if(sel.size||selImg){ sel=new Set(); selImg=null; updateUI(); invalidate(); } else setTool('select'); return;
     case 'Equal': case 'NumpadAdd': zoomAt(1.25,W/2,H/2); return;
     case 'Minus': case 'NumpadSubtract': zoomAt(1/1.25,W/2,H/2); return;
     case 'Digit1': if(e.shiftKey){ fitView(); } return;
