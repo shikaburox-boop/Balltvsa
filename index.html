@@ -32,7 +32,7 @@
 
         <!-- 🛡️ ส่วน Agent Dashboard (แสดงเมื่อล็อกอินแล้ว) -->
         <div id="dashboard-section" class="panel hidden">
-            <h2>⚡ DASHBOARD ⚡</h2>
+            <h2>🛡️ AGENT DASHBOARD</h2>
             
             <div class="user-card">
                 <h3 id="display-name" style="color: #fff; margin-bottom: 5px;">-</h3>
@@ -40,13 +40,12 @@
                 <p style="margin-top: 10px; font-size: 14px;">คะแนนสูงสุด (High Score): <strong id="high-score" style="color: #3fb950;">0</strong></p>
             </div>
 
-            <!-- ⚡ เพิ่มส่วนปุ่ม Click ฝึกความไวกลับมาตรงนี้ -->
+            <!-- ⚡ ส่วนปุ่ม Click ฝึกความไว (บันทึกอัตโนมัติทุกครั้งที่คลิก) -->
             <div class="game-box">
                 <h4>⚡ Speed Clicker Training</h4>
-                <p style="font-size: 12px; color: #8b949e; margin: 6px 0 12px;">กดปุ่มเพื่อเพิ่มคะแนนและบันทึกเข้า Supabase!</p>
+                <p style="font-size: 12px; color: #8b949e; margin: 6px 0 12px;">กดปุ่มเพื่อเพิ่มคะแนนและซิงก์เข้า Supabase อัตโนมัติ</p>
                 <h2 id="current-score" style="font-size: 28px; color: #fff; margin-bottom: 12px;">0</h2>
                 <button class="click-btn" onclick="addPoint()">CLICK!</button>
-                <button class="btn btn-secondary" style="margin-top: 12px;" onclick="saveScore()">💾 บันทึกคะแนนลง Database</button>
             </div>
 
             <div class="leaderboard-box">
