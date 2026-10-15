@@ -5,6 +5,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
+let currentClickScore = 0;
 
 function showMessage(msg, isError = false) {
     const msgBox = document.getElementById('auth-msg');
@@ -15,7 +16,6 @@ function showMessage(msg, isError = false) {
     msgBox.style.border = isError ? '1px solid rgba(248, 81, 73, 0.4)' : '1px solid rgba(46, 160, 67, 0.4)';
 }
 
-// ตรวจสอบการล็อกอินค้างไว้จาก LocalStorage
 async function checkAuthStatus() {
     const savedUser = localStorage.getItem("balltvsa_user");
     if (savedUser) {
@@ -31,11 +31,10 @@ async function checkAuthStatus() {
         }
     }
     loadLeaderboard();
-    setupRealtimeSubscription(); // เปิดใช้งาน Real-time อัปเดตตารางอันดับสดๆ
+    setupRealtimeSubscription();
 }
 checkAuthStatus();
 
-// ดึงตารางจัดอันดับ High Score ของทุกคน
 async function loadLeaderboard() {
     const { data, error } = await db
         .from('profiles')
@@ -60,16 +59,43 @@ async function loadLeaderboard() {
     listEl.innerHTML = html;
 }
 
-// ⚡ ฟังก์ชันตั้งค่า Supabase Realtime ฟังการเปลี่ยนแปลงตาราง profiles
 function setupRealtimeSubscription() {
     db.channel('public:profiles')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-          loadLeaderboard(); // รีเฟรชตารางอัตโนมัติทันทีที่มีการเปลี่ยนแปลงในฐานข้อมูล
+          loadLeaderboard();
       })
       .subscribe();
 }
 
-// สมัครสมาชิก
+// ⚡ ฟังก์ชันกดปุ่มเพิ่มคะแนน
+function addPoint() {
+    currentClickScore++;
+    document.getElementById('current-score').textContent = currentClickScore;
+}
+
+// 💾 บันทึกคะแนนลง Supabase
+async function saveScore() {
+    if (!currentUser) return;
+
+    if (currentClickScore > (currentUser.high_score || 0)) {
+        const { error } = await db
+            .from('profiles')
+            .update({ high_score: currentClickScore })
+            .eq('id', currentUser.id);
+
+        if (!error) {
+            currentUser.high_score = currentClickScore;
+            document.getElementById('high-score').textContent = currentClickScore;
+            alert('🎉 ทำสถิติใหม่และบันทึกคะแนนลง Supabase เรียบร้อย!');
+            loadLeaderboard();
+        } else {
+            alert('บันทึกไม่สำเร็จ: ' + error.message);
+        }
+    } else {
+        alert('คะแนนยังไม่ทำลายสถิติสูงสุดเดิมของคุณ');
+    }
+}
+
 async function handleRegister() {
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
@@ -101,7 +127,6 @@ async function handleRegister() {
     }
 }
 
-// เข้าสู่ระบบ
 async function handleLogin() {
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
@@ -122,24 +147,25 @@ async function handleLogin() {
         showMessage('Username หรือ Password ไม่ถูกต้อง!', true);
     } else {
         currentUser = data;
+        currentClickScore = currentUser.high_score || 0;
         localStorage.setItem("balltvsa_user", currentUser.username);
         showDashboard();
     }
 }
 
-// แสดงหน้า Dashboard
 function showDashboard() {
     document.getElementById('auth-section').classList.add('hidden');
     document.getElementById('dashboard-section').classList.remove('hidden');
     document.getElementById('display-name').textContent = currentUser.username;
     document.getElementById('high-score').textContent = currentUser.high_score || 0;
+    document.getElementById('current-score').textContent = currentClickScore;
     loadLeaderboard();
 }
 
-// ออกจากระบบ
 function logout() {
     localStorage.removeItem("balltvsa_user");
     currentUser = null;
+    currentClickScore = 0;
     document.getElementById('username').value = '';
     document.getElementById('password').value = '';
     document.getElementById('auth-msg').style.display = 'none';
