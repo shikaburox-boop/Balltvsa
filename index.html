@@ -13,16 +13,16 @@
     <div class="main-container">
         <!-- 🔒 ส่วนสำหรับ Login / Register (แสดงเมื่อยังไม่ล็อกอิน) -->
         <div id="auth-section" class="panel">
-            <h2>🔒 IDENTITY VERIFICATION</h2>
+            <h2>Login ก่อน</h2>
             <div id="auth-msg" class="message" style="display:none;"></div>
             
             <div class="form-group">
-                <label>Username / Agent ID</label>
+                <label>Username / ID</label>
                 <input type="text" id="username" placeholder="กรอกชื่อผู้ใช้">
             </div>
             
             <div class="form-group">
-                <label>Security Code / Password</label>
+                <label>Password</label>
                 <input type="password" id="password" placeholder="กรอกรหัสผ่าน">
             </div>
 
@@ -32,7 +32,7 @@
 
         <!-- 🛡️ ส่วน Agent Dashboard (แสดงเมื่อล็อกอินแล้ว) -->
         <div id="dashboard-section" class="panel hidden">
-            <h2>🛡️ AGENT DASHBOARD</h2>
+            <h2>⚡ DASHBOARD ⚡</h2>
             
             <div class="user-card">
                 <h3 id="display-name" style="color: #fff; margin-bottom: 5px;">-</h3>
@@ -42,14 +42,14 @@
 
             <!-- ⚡ ส่วนปุ่ม Click ฝึกความไว (บันทึกอัตโนมัติทุกครั้งที่คลิก) -->
             <div class="game-box">
-                <h4>⚡ Speed Clicker Training</h4>
+                <h4>Speed Clicker</h4>
                 <p style="font-size: 12px; color: #8b949e; margin: 6px 0 12px;">กดปุ่มเพื่อเพิ่มคะแนนและซิงก์เข้า Supabase อัตโนมัติ</p>
                 <h2 id="current-score" style="font-size: 28px; color: #fff; margin-bottom: 12px;">0</h2>
                 <button class="click-btn" onclick="addPoint()">CLICK!</button>
             </div>
 
             <div class="leaderboard-box">
-                <h3>🏆 AGENTS LEADERBOARD</h3>
+                <h3>🏆 LEADERBOARD</h3>
                 <div id="leaderboard-list">กำลังโหลดข้อมูล...</div>
             </div>
 
