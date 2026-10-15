@@ -197,8 +197,8 @@
                 <input type="password" id="password" placeholder="กรอกรหัสผ่าน">
             </div>
 
-            <button class="btn" onclick="login()">เข้าสู่ระบบ (Login)</button>
-            <button class="btn btn-secondary" onclick="register()">ลงทะเบียนใหม่ (Register)</button>
+            <button class="btn" onclick="handleLogin()">เข้าสู่ระบบ (Login)</button>
+            <button class="btn btn-secondary" onclick="handleRegister()">ลงทะเบียนใหม่ (Register)</button>
         </div>
 
         <!-- Section: Dashboard & Game -->
@@ -228,12 +228,12 @@
         const SUPABASE_URL = "https://saxvncakpljuzyhhuqcv.supabase.co/rest/v1/"; // <-- ใส่ URL จาก Supabase ตรงนี้
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNheHZuY2FrcGxqdXp5aGh1cWN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNjI3NDgsImV4cCI6MjEwNzYzODc0OH0.OJqvx5cvJ3VMcPFsOZ7o1PsrtI_6Wzgo_4Wds_k9Hfk"; // <-- ใส่ Anon Key ตรงนี้
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let currentUser = null;
         let score = 0;
 
-        // ฟังก์ชันแจ้งเตือน ข้อความ
+        // ฟังก์ชันแจ้งเตือนข้อความ
         function showMessage(msg, isError = false) {
             const msgBox = document.getElementById('auth-msg');
             msgBox.textContent = msg;
@@ -241,7 +241,7 @@
         }
 
         // สมัครสมาชิก
-        async function register() {
+        async function handleRegister() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
 
@@ -251,11 +251,11 @@
             }
 
             // เช็คว่ามี Username นี้หรือยัง
-            const { data: existingUser } = await supabase
+            const { data: existingUser } = await db
                 .from('profiles')
                 .select('*')
                 .eq('username', username)
-                .single();
+                .maybeSingle();
 
             if (existingUser) {
                 showMessage('Username นี้มีผู้ใช้งานแล้ว!', true);
@@ -263,7 +263,7 @@
             }
 
             // เพิ่มข้อมูลลงตาราง profiles
-            const { error } = await supabase
+            const { error } = await db
                 .from('profiles')
                 .insert([{ username: username, password: password, high_score: 0 }]);
 
@@ -275,7 +275,7 @@
         }
 
         // เข้าสู่ระบบ
-        async function login() {
+        async function handleLogin() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
 
@@ -284,12 +284,12 @@
                 return;
             }
 
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('profiles')
                 .select('*')
                 .eq('username', username)
                 .eq('password', password)
-                .single();
+                .maybeSingle();
 
             if (error || !data) {
                 showMessage('Username หรือ Password ไม่ถูกต้อง!', true);
@@ -320,7 +320,7 @@
             if (!currentUser) return;
 
             if (score > (currentUser.high_score || 0)) {
-                const { error } = await supabase
+                const { error } = await db
                     .from('profiles')
                     .update({ high_score: score })
                     .eq('id', currentUser.id);
@@ -328,7 +328,7 @@
                 if (!error) {
                     currentUser.high_score = score;
                     document.getElementById('high-score').textContent = score;
-                    alert('🎉 ยินดีด้วย! ทำทำสถิติใหม่สำเร็จและบันทึกข้อมูลแล้ว');
+                    alert('🎉 ยินดีด้วย! ทำสถิติใหม่สำเร็จและบันทึกข้อมูลแล้ว');
                 } else {
                     alert('บันทึกคะแนนไม่สำเร็จ: ' + error.message);
                 }
