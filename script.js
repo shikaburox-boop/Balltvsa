@@ -6,6 +6,7 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let currentClickScore = 0;
+let saveTimeout = null;
 
 function showMessage(msg, isError = false) {
     const msgBox = document.getElementById('auth-msg');
@@ -27,6 +28,8 @@ async function checkAuthStatus() {
 
         if (data && !error) {
             currentUser = data;
+            // ดึงคะแนนสูงสุดเดิมมาตั้งเป็นคะแนนเริ่มต้นตอนเข้าเว็บ
+            currentClickScore = currentUser.high_score || 0;
             showDashboard();
         }
     }
@@ -35,6 +38,7 @@ async function checkAuthStatus() {
 }
 checkAuthStatus();
 
+// ดึงตารางจัดอันดับ High Score ของทุกคน
 async function loadLeaderboard() {
     const { data, error } = await db
         .from('profiles')
@@ -59,6 +63,7 @@ async function loadLeaderboard() {
     listEl.innerHTML = html;
 }
 
+// ⚡ ฟังการเปลี่ยนแปลงตารางใน Supabase แบบ Real-time
 function setupRealtimeSubscription() {
     db.channel('public:profiles')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
@@ -67,32 +72,24 @@ function setupRealtimeSubscription() {
       .subscribe();
 }
 
-// ⚡ ฟังก์ชันกดปุ่มเพิ่มคะแนน
+// ⚡ ฟังก์ชันกดปุ่มเพิ่มคะแนน และส่งข้อมูลเข้า Supabase อัตโนมัติทันที
 function addPoint() {
+    if (!currentUser) return;
+    
     currentClickScore++;
     document.getElementById('current-score').textContent = currentClickScore;
-}
-
-// 💾 บันทึกคะแนนลง Supabase
-async function saveScore() {
-    if (!currentUser) return;
 
     if (currentClickScore > (currentUser.high_score || 0)) {
-        const { error } = await db
-            .from('profiles')
-            .update({ high_score: currentClickScore })
-            .eq('id', currentUser.id);
+        currentUser.high_score = currentClickScore;
+        document.getElementById('high-score').textContent = currentClickScore;
 
-        if (!error) {
-            currentUser.high_score = currentClickScore;
-            document.getElementById('high-score').textContent = currentClickScore;
-            alert('🎉 ทำสถิติใหม่และบันทึกคะแนนลง Supabase เรียบร้อย!');
-            loadLeaderboard();
-        } else {
-            alert('บันทึกไม่สำเร็จ: ' + error.message);
-        }
-    } else {
-        alert('คะแนนยังไม่ทำลายสถิติสูงสุดเดิมของคุณ');
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(async () => {
+            await db
+                .from('profiles')
+                .update({ high_score: currentClickScore })
+                .eq('id', currentUser.id);
+        }, 500);
     }
 }
 
@@ -147,7 +144,7 @@ async function handleLogin() {
         showMessage('Username หรือ Password ไม่ถูกต้อง!', true);
     } else {
         currentUser = data;
-        currentClickScore = currentUser.high_score || 0;
+        currentClickScore = currentUser.high_score || 0; // โหลดคะแนนเก่ามาเก็บไว้
         localStorage.setItem("balltvsa_user", currentUser.username);
         showDashboard();
     }
@@ -158,7 +155,7 @@ function showDashboard() {
     document.getElementById('dashboard-section').classList.remove('hidden');
     document.getElementById('display-name').textContent = currentUser.username;
     document.getElementById('high-score').textContent = currentUser.high_score || 0;
-    document.getElementById('current-score').textContent = currentClickScore;
+    document.getElementById('current-score').textContent = currentClickScore; // แสดงคะแนนล่าสุด
     loadLeaderboard();
 }
 
