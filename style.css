@@ -2,17 +2,20 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Courier New', Courier, monospace, 'Segoe UI';
 }
 
 body {
-    background-color: #0d1117;
-    color: #c9d1d9;
+    background-color: #030712;
+    color: #e6edf3;
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
     padding: 20px;
+    background-image: 
+        radial-gradient(circle at 10% 20%, rgba(88, 166, 255, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(137, 87, 229, 0.08) 0%, transparent 40%);
 }
 
 .main-container {
@@ -22,88 +25,104 @@ body {
 }
 
 .panel {
-    background: #161b22;
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(12px);
     border: 1px solid #30363d;
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 30px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(88, 166, 255, 0.05);
 }
 
 h2 {
     color: #58a6ff;
     margin-bottom: 20px;
     text-align: center;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 20px;
+    letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
 }
 
 .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 16px;
 }
 
 label {
     display: block;
     margin-bottom: 6px;
-    font-size: 13px;
+    font-size: 12px;
     color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 input {
     width: 100%;
-    padding: 10px 12px;
-    background: #0d1117;
+    padding: 12px 14px;
+    background: #010409;
     border: 1px solid #30363d;
-    border-radius: 6px;
+    border-radius: 8px;
     color: #fff;
     font-size: 14px;
     outline: none;
+    transition: all 0.3s ease;
 }
 
 input:focus {
     border-color: #58a6ff;
+    box-shadow: 0 0 10px rgba(88, 166, 255, 0.25);
 }
 
 .btn {
     width: 100%;
-    padding: 10px;
-    background: #238636;
+    padding: 12px;
+    background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
     color: #fff;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 14px;
     font-weight: bold;
     cursor: pointer;
     margin-top: 10px;
-    transition: 0.2s;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
+    letter-spacing: 0.5px;
 }
 
 .btn:hover {
-    background: #2ea043;
+    background: linear-gradient(135deg, #2ea043 0%, #3fb950 100%);
+    box-shadow: 0 6px 16px rgba(46, 160, 67, 0.4);
+    transform: translateY(-1px);
 }
 
 .btn-secondary {
     background: #21262d;
     border: 1px solid #30363d;
+    box-shadow: none;
     margin-top: 8px;
+    color: #c9d1d9;
 }
 
 .btn-secondary:hover {
     background: #30363d;
+    box-shadow: 0 4px 12px rgba(48, 54, 61, 0.4);
 }
 
 .btn-danger {
-    background: #da3633;
-    margin-top: 15px;
+    background: linear-gradient(135deg, #da3633 0%, #f85149 100%);
+    box-shadow: 0 4px 12px rgba(218, 54, 51, 0.3);
+    margin-top: 20px;
 }
 
 .btn-danger:hover {
-    background: #f85149;
+    background: linear-gradient(135deg, #f85149 0%, #ff7b72 100%);
+    box-shadow: 0 6px 16px rgba(248, 81, 73, 0.4);
 }
 
 .message {
     margin-bottom: 15px;
     padding: 10px;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 13px;
     text-align: center;
 }
@@ -113,64 +132,82 @@ input:focus {
 }
 
 .user-card, .leaderboard-box {
-    background: #0d1117;
+    background: #010409;
     border: 1px solid #30363d;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 16px;
     text-align: center;
 }
 
 .status-badge {
     display: inline-block;
-    padding: 4px 10px;
-    background: rgba(56, 139, 253, 0.15);
+    padding: 4px 12px;
+    background: rgba(56, 139, 253, 0.12);
     color: #58a6ff;
-    border: 1px solid rgba(56, 139, 253, 0.4);
-    border-radius: 12px;
+    border: 1px solid rgba(56, 139, 253, 0.3);
+    border-radius: 20px;
     font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 10px rgba(56, 139, 253, 0.1);
+}
+
+/* ดีไซน์กล่องเกม Speed Clicker */
+.game-box {
+    background: #010409;
+    border: 1px dashed #30363d;
+    border-radius: 10px;
+    padding: 18px;
+    text-align: center;
+    margin-bottom: 16px;
+    transition: border-color 0.3s;
+}
+
+.game-box:hover {
+    border-color: #8957e5;
+}
+
+.click-btn {
+    background: linear-gradient(135deg, #8957e5 0%, #a371f7 100%);
+    color: #fff;
+    border: none;
+    padding: 14px 28px;
+    font-size: 18px;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(137, 87, 229, 0.4);
+    transition: all 0.1s ease;
+    width: 100%;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.click-btn:hover {
+    box-shadow: 0 8px 24px rgba(137, 87, 229, 0.6);
+    transform: translateY(-2px);
+}
+
+.click-btn:active {
+    transform: scale(0.96);
 }
 
 .leaderboard-box h3 {
     color: #58a6ff;
     font-size: 13px;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
 }
 
 .lb-item {
     display: flex;
     justify-content: space-between;
-    padding: 6px 0;
-    border-bottom: 1px dashed #21262d;
+    padding: 8px 4px;
+    border-bottom: 1px solid #21262d;
     font-size: 13px;
+    align-items: center;
 }
 
 .lb-item:last-child {
     border-bottom: none;
-}
-.game-box {
-    background: #0d1117;
-    border: 1px dashed #30363d;
-    border-radius: 8px;
-    padding: 15px;
-    text-align: center;
-    margin-bottom: 15px;
-}
-
-.click-btn {
-    background: #8957e5;
-    color: #fff;
-    border: none;
-    padding: 12px 25px;
-    font-size: 16px;
-    border-radius: 50px;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(137, 87, 229, 0.4);
-    transition: transform 0.1s;
-    width: 100%;
-    font-weight: bold;
-}
-
-.click-btn:active {
-    transform: scale(0.95);
 }
