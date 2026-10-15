@@ -3,9 +3,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
  
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
  
-// Supabase Auth ต้องใช้อีเมล จึงแปลง username เป็นอีเมลภายในระบบ (ไม่มีการส่งอีเมลจริง)
-const EMAIL_DOMAIN = "users.balltvsa.com";
-const toEmail = (username) => `${username.toLowerCase()}@${EMAIL_DOMAIN}`;
+const TOKEN_KEY = "balltvsa_token";
  
 let currentUser = null; // { id, username, high_score }
 let currentClickScore = 0;
@@ -13,6 +11,8 @@ let saveTimeout = null;
 let pendingSave = false;
 let lbTimeout = null;
 let realtimeStarted = false;
+ 
+const getToken = () => localStorage.getItem(TOKEN_KEY);
  
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -30,23 +30,16 @@ function showMessage(msg, isError = false) {
 }
  
 // ---------- Session / Auth ----------
-async function loadProfile(userId) {
-    const { data, error } = await db
-        .from('profiles')
-        .select('id, username, high_score')
-        .eq('id', userId)
-        .maybeSingle();
-    return error ? null : data;
-}
- 
 async function checkAuthStatus() {
-    const { data: { session } } = await db.auth.getSession();
-    if (session) {
-        const profile = await loadProfile(session.user.id);
-        if (profile) {
-            currentUser = profile;
-            currentClickScore = profile.high_score || 0;
+    const token = getToken();
+    if (token) {
+        const { data, error } = await db.rpc('get_me', { p_token: token });
+        if (!error && data) {
+            currentUser = data;
+            currentClickScore = data.high_score || 0;
             showDashboard();
+        } else if (!error) {
+            localStorage.removeItem(TOKEN_KEY); // token หมดอายุหรือไม่ถูกต้อง
         }
     }
     loadLeaderboard();
@@ -63,8 +56,8 @@ function validateInputs(username, password) {
         showMessage('Username ใช้ได้เฉพาะ A-Z, 0-9, _ ความยาว 3-20 ตัวอักษร', true);
         return false;
     }
-    if (password.length < 6) {
-        showMessage('Password ต้องมีอย่างน้อย 6 ตัวอักษร', true);
+    if (password.length < 4) {
+        showMessage('Password ต้องมีอย่างน้อย 4 ตัวอักษร', true);
         return false;
     }
     return true;
@@ -75,19 +68,14 @@ async function handleRegister() {
     const password = document.getElementById('password').value;
     if (!validateInputs(username, password)) return;
  
-    const { error } = await db.auth.signUp({
-        email: toEmail(username),
-        password: password,
-        options: { data: { username: username } }
-    });
+    const { error } = await db.rpc('register_user', { p_username: username, p_password: password });
  
     if (error) {
-        const msg = (error.message || '').toLowerCase();
-        if (msg.includes('already') || msg.includes('database error')) {
-            showMessage('Username นี้มีผู้ใช้งานแล้ว!', true);
-        } else {
-            showMessage('เกิดข้อผิดพลาด: ' + error.message, true);
-        }
+        const msg = error.message || '';
+        if (msg.includes('username_taken')) showMessage('Username นี้มีผู้ใช้งานแล้ว!', true);
+        else if (msg.includes('invalid_username')) showMessage('Username ไม่ถูกต้อง (A-Z, 0-9, _ ยาว 3-20 ตัว)', true);
+        else if (msg.includes('invalid_password')) showMessage('Password ต้องยาว 4-72 ตัวอักษร', true);
+        else showMessage('เกิดข้อผิดพลาด: ' + msg, true);
         return;
     }
     showMessage('สมัครสมาชิกสำเร็จ! สามารถเข้าสู่ระบบได้เลย');
@@ -102,31 +90,36 @@ async function handleLogin() {
         return;
     }
  
-    const { data, error } = await db.auth.signInWithPassword({
-        email: toEmail(username),
-        password: password
-    });
+    const { data, error } = await db.rpc('login_user', { p_username: username, p_password: password });
  
-    if (error || !data.user) {
-        showMessage('Username หรือ Password ไม่ถูกต้อง!', true);
+    if (error || !data) {
+        const msg = error?.message || '';
+        if (!error || msg.includes('invalid_credentials')) {
+            showMessage('Username หรือ Password ไม่ถูกต้อง!', true);
+        } else {
+            showMessage('เกิดข้อผิดพลาด: ' + msg, true);
+        }
         return;
     }
  
-    const profile = await loadProfile(data.user.id);
-    if (!profile) {
-        showMessage('ไม่พบข้อมูลโปรไฟล์ กรุณาลองใหม่', true);
-        return;
-    }
-    currentUser = profile;
-    currentClickScore = profile.high_score || 0;
+    localStorage.setItem(TOKEN_KEY, data.token);
+    currentUser = { id: data.id, username: data.username, high_score: data.high_score };
+    currentClickScore = currentUser.high_score || 0;
     showDashboard();
 }
  
 async function logout() {
     await flushScore();
-    await db.auth.signOut();
+    const token = getToken();
+    if (token) await db.rpc('logout_user', { p_token: token });
+    localStorage.removeItem(TOKEN_KEY);
+    resetToLoginScreen();
+}
+ 
+function resetToLoginScreen() {
     currentUser = null;
     currentClickScore = 0;
+    pendingSave = false;
     document.getElementById('username').value = '';
     document.getElementById('password').value = '';
     document.getElementById('auth-msg').style.display = 'none';
@@ -169,7 +162,7 @@ async function loadLeaderboard() {
     listEl.innerHTML = html;
 }
  
-// หน่วงการโหลดซ้ำ เพื่อไม่ให้ยิง query ถี่เกินไปตอนมีคนคลิกรัว ๆ
+// หน่วงการโหลดซ้ำ ไม่ให้ยิง query ถี่เกินไปตอนมีคนคลิกรัว ๆ
 function scheduleLeaderboardReload() {
     clearTimeout(lbTimeout);
     lbTimeout = setTimeout(loadLeaderboard, 400);
@@ -189,16 +182,23 @@ async function flushScore() {
     if (!pendingSave || !currentUser) return;
     pendingSave = false;
  
-    const { data, error } = await db.rpc('submit_score', { new_score: currentClickScore });
+    const { data, error } = await db.rpc('submit_score', { p_token: getToken(), new_score: currentClickScore });
+ 
     if (error) {
-        // เซิร์ฟเวอร์ปฏิเสธ (เช่น คลิกเร็วผิดปกติ) -> ย้อนกลับไปใช้คะแนนที่ยืนยันแล้ว
         console.warn('save failed:', error.message);
-        const { data: fresh } = await db.from('profiles').select('high_score').eq('id', currentUser.id).maybeSingle();
-        if (fresh) {
-            currentUser.high_score = fresh.high_score;
-            currentClickScore = fresh.high_score;
-            document.getElementById('high-score').textContent = fresh.high_score;
-            document.getElementById('current-score').textContent = fresh.high_score;
+        if ((error.message || '').includes('invalid_session')) {
+            localStorage.removeItem(TOKEN_KEY);
+            resetToLoginScreen();
+            showMessage('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่', true);
+            return;
+        }
+        // ถูกปฏิเสธ (เช่น คลิกเร็วผิดปกติ) -> กลับไปใช้คะแนนที่ยืนยันแล้ว
+        const { data: me } = await db.rpc('get_me', { p_token: getToken() });
+        if (me) {
+            currentUser.high_score = me.high_score;
+            currentClickScore = me.high_score;
+            document.getElementById('high-score').textContent = me.high_score;
+            document.getElementById('current-score').textContent = me.high_score;
         }
         return;
     }
