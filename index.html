@@ -3,197 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Identity Verification & Cyber Portal - Balltvsa.com</title>
+    <title>Balltvsa.com - Cyber Security Portal</title>
+    <link rel="stylesheet" href="style.css">
     <!-- Supabase JS Client Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background-color: #0d1117;
-            color: #c9d1d9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 12px;
-            padding: 30px;
-            width: 100%;
-            max-width: 450px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-        }
-
-        h2 {
-            color: #58a6ff;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: 600;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 14px;
-            color: #8b949e;
-        }
-
-        input {
-            width: 100%;
-            padding: 10px 12px;
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-        }
-
-        input:focus {
-            border-color: #58a6ff;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 10px;
-            background: #238636;
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-            transition: 0.2s;
-        }
-
-        .btn:hover {
-            background: #2ea043;
-        }
-
-        .btn-secondary {
-            background: #21262d;
-            border: 1px solid #30363d;
-            margin-top: 8px;
-        }
-
-        .btn-secondary:hover {
-            background: #30363d;
-        }
-
-        .btn-danger {
-            background: #da3633;
-            margin-top: 20px;
-        }
-
-        .btn-danger:hover {
-            background: #f85149;
-        }
-
-        .message {
-            margin-top: 15px;
-            padding: 10px;
-            border-radius: 6px;
-            font-size: 13px;
-            text-align: center;
-            display: none;
-        }
-
-        .message.error {
-            background: rgba(248, 81, 73, 0.15);
-            color: #f85149;
-            border: 1px solid rgba(248, 81, 73, 0.4);
-            display: block;
-        }
-
-        .message.success {
-            background: rgba(46, 160, 67, 0.15);
-            color: #3fb950;
-            border: 1px solid rgba(46, 160, 67, 0.4);
-            display: block;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        /* Dashboard Styles */
-        .user-card {
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            background: rgba(56, 139, 253, 0.15);
-            color: #58a6ff;
-            border: 1px solid rgba(56, 139, 253, 0.4);
-            border-radius: 12px;
-            font-size: 12px;
-            margin-top: 6px;
-        }
-
-        /* Game Box */
-        .game-box {
-            background: #0d1117;
-            border: 1px dashed #30363d;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            margin-top: 15px;
-        }
-
-        .click-btn {
-            background: #8957e5;
-            color: #fff;
-            border: none;
-            padding: 15px 30px;
-            font-size: 18px;
-            border-radius: 50px;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(137, 87, 229, 0.4);
-            transition: transform 0.1s;
-        }
-
-        .click-btn:active {
-            transform: scale(0.95);
-        }
-    </style>
 </head>
 <body>
 
-    <div class="container">
-        <!-- Section: Identity Login / Register -->
-        <div id="auth-section">
-            <h2>🔒 Identity Verification</h2>
-            <div id="auth-msg" class="message"></div>
+    <div class="main-container">
+        <!-- 🔒 ส่วนสำหรับ Login / Register (แสดงเมื่อยังไม่ล็อกอิน) -->
+        <div id="auth-section" class="panel">
+            <h2>🔒 IDENTITY VERIFICATION</h2>
+            <div id="auth-msg" class="message" style="display:none;"></div>
             
             <div class="form-group">
-                <label for="username">Username / Agent ID</label>
+                <label>Username / Agent ID</label>
                 <input type="text" id="username" placeholder="กรอกชื่อผู้ใช้">
             </div>
             
             <div class="form-group">
-                <label for="password">Security Code / Password</label>
+                <label>Security Code / Password</label>
                 <input type="password" id="password" placeholder="กรอกรหัสผ่าน">
             </div>
 
@@ -201,152 +30,25 @@
             <button class="btn btn-secondary" onclick="handleRegister()">ลงทะเบียนใหม่ (Register)</button>
         </div>
 
-        <!-- Section: Dashboard & Game -->
-        <div id="dashboard-section" class="hidden">
-            <h2>🛡️ Agent Dashboard</h2>
+        <!-- 🛡️ ส่วน Agent Dashboard (แสดงเมื่อล็อกอินแล้ว) -->
+        <div id="dashboard-section" class="panel hidden">
+            <h2>🛡️ AGENT DASHBOARD</h2>
             
             <div class="user-card">
-                <h3 id="display-name" style="color: #fff;">-</h3>
+                <h3 id="display-name" style="color: #fff; margin-bottom: 5px;">-</h3>
                 <span class="status-badge">VERIFIED AGENT</span>
                 <p style="margin-top: 10px; font-size: 14px;">คะแนนสูงสุด (High Score): <strong id="high-score" style="color: #3fb950;">0</strong></p>
             </div>
 
-            <div class="game-box">
-                <h4>⚡ Speed Clicker Training</h4>
-                <p style="font-size: 12px; color: #8b949e; margin: 8px 0 15px;">กดปุ่มเพื่อฝึกความไวและบันทึกคะแนนเข้า Supabase!</p>
-                <h2 id="current-score" style="font-size: 32px; color: #fff; margin-bottom: 15px;">0</h2>
-                <button class="click-btn" onclick="addPoint()">CLICK!</button>
-                <button class="btn btn-secondary" style="margin-top: 15px;" onclick="saveScore()">💾 บันทึกคะแนนลง Database</button>
+            <div class="leaderboard-box">
+                <h3>🏆 AGENTS LEADERBOARD</h3>
+                <div id="leaderboard-list">กำลังโหลดข้อมูล...</div>
             </div>
 
             <button class="btn btn-danger" onclick="logout()">ออกจากระบบ (Logout)</button>
         </div>
     </div>
 
-    <script>
-        // === ตั้งค่า SUPABASE CONFIG ===
-        const SUPABASE_URL = "https://saxvncakpljuzyhhuqcv.supabase.co"; // <-- ใส่ URL จาก Supabase ตรงนี้
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNheHZuY2FrcGxqdXp5aGh1cWN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNjI3NDgsImV4cCI6MjEwNzYzODc0OH0.OJqvx5cvJ3VMcPFsOZ7o1PsrtI_6Wzgo_4Wds_k9Hfk"; // <-- ใส่ Anon Key ตรงนี้
-
-        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        let currentUser = null;
-        let score = 0;
-
-        // ฟังก์ชันแจ้งเตือนข้อความ
-        function showMessage(msg, isError = false) {
-            const msgBox = document.getElementById('auth-msg');
-            msgBox.textContent = msg;
-            msgBox.className = isError ? 'message error' : 'message success';
-        }
-
-        // สมัครสมาชิก
-        async function handleRegister() {
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
-
-            if (!username || !password) {
-                showMessage('กรุณากรอก Username และ Password ให้ครบถ้วน', true);
-                return;
-            }
-
-            // เช็คว่ามี Username นี้หรือยัง
-            const { data: existingUser } = await db
-                .from('profiles')
-                .select('*')
-                .eq('username', username)
-                .maybeSingle();
-
-            if (existingUser) {
-                showMessage('Username นี้มีผู้ใช้งานแล้ว!', true);
-                return;
-            }
-
-            // เพิ่มข้อมูลลงตาราง profiles
-            const { error } = await db
-                .from('profiles')
-                .insert([{ username: username, password: password, high_score: 0 }]);
-
-            if (error) {
-                showMessage('เกิดข้อผิดพลาดในการสมัครสมาชิก: ' + error.message, true);
-            } else {
-                showMessage('สมัครสมาชิกสำเร็จ! สามารถกดเข้าสู่ระบบได้เลย');
-            }
-        }
-
-        // เข้าสู่ระบบ
-        async function handleLogin() {
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
-
-            if (!username || !password) {
-                showMessage('กรุณากรอก Username และ Password', true);
-                return;
-            }
-
-            const { data, error } = await db
-                .from('profiles')
-                .select('*')
-                .eq('username', username)
-                .eq('password', password)
-                .maybeSingle();
-
-            if (error || !data) {
-                showMessage('Username หรือ Password ไม่ถูกต้อง!', true);
-            } else {
-                currentUser = data;
-                score = currentUser.high_score || 0;
-                showDashboard();
-            }
-        }
-
-        // แสดงหน้า Dashboard
-        function showDashboard() {
-            document.getElementById('auth-section').classList.add('hidden');
-            document.getElementById('dashboard-section').classList.remove('hidden');
-            document.getElementById('display-name').textContent = currentUser.username;
-            document.getElementById('high-score').textContent = currentUser.high_score || 0;
-            document.getElementById('current-score').textContent = score;
-        }
-
-        // ปุ่มฝึกคลิก
-        function addPoint() {
-            score++;
-            document.getElementById('current-score').textContent = score;
-        }
-
-        // บันทึกคะแนนลง Supabase
-        async function saveScore() {
-            if (!currentUser) return;
-
-            if (score > (currentUser.high_score || 0)) {
-                const { error } = await db
-                    .from('profiles')
-                    .update({ high_score: score })
-                    .eq('id', currentUser.id);
-
-                if (!error) {
-                    currentUser.high_score = score;
-                    document.getElementById('high-score').textContent = score;
-                    alert('🎉 ยินดีด้วย! ทำสถิติใหม่สำเร็จและบันทึกข้อมูลแล้ว');
-                } else {
-                    alert('บันทึกคะแนนไม่สำเร็จ: ' + error.message);
-                }
-            } else {
-                alert('คะแนนปัจจุบันยังไม่ทำลายสถิติสูงสุดของคุณ');
-            }
-        }
-
-        // ออกจากระบบ
-        function logout() {
-            currentUser = null;
-            score = 0;
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-            document.getElementById('auth-msg').className = 'message';
-            document.getElementById('dashboard-section').classList.add('hidden');
-            document.getElementById('auth-section').classList.remove('hidden');
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
