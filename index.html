@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balltvsa.com :: Terminal</title>
+    <!-- โหลดฟอนต์แนว Terminal จาก Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #0c0c0c;
+            color: #00ff66;
+            font-family: 'Share Tech Mono', monospace;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #1f3a1f;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: #00aa44;
+        }
+
+        .terminal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot-red { background-color: #ff5f56; }
+        .dot-yellow { background-color: #ffbd2e; }
+        .dot-green { background-color: #27c93f; }
+
+        .terminal-body {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 5px;
+            scroll-behavior: smooth;
+        }
+
+        /* ซ่อน Scrollbar แต่วิ่งได้ปกติ */
+        .terminal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        .terminal-body::-webkit-scrollbar-thumb {
+            background: #1f3a1f;
+            border-radius: 3px;
+        }
+
+        .output-line {
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .input-container {
+            display: flex;
+            align-items: center;
+            margin-top: 15px;
+            border-top: 1px solid #1f3a1f;
+            padding-top: 10px;
+        }
+
+        .prompt-symbol {
+            color: #00ff66;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        #command-input {
+            background: transparent;
+            border: none;
+            color: #00ff66;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.1rem;
+            outline: none;
+            flex: 1;
+        }
+
+        .highlight {
+            color: #ffbd2e;
+        }
+
+        .link {
+            color: #00d2ff;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="terminal-header">
+        <div class="terminal-buttons">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+        </div>
+        <div>balltvsa@system-host: ~ (bash)</div>
+        <div id="clock">00:00:00</div>
+    </div>
+
+    <div class="terminal-body" id="terminal-body">
+        <div class="output-line">Last login: <span class="highlight">Thu Oct 15 20:13:00</span> on ttys001</div>
+        <div class="output-line">Welcome to <span class="highlight">Balltvsa.com</span> Terminal v1.0.0</div>
+        <div class="output-line">Type <span class="highlight">'help'</span> to see a list of available commands.</div>
+        <br>
+    </div>
+
+    <div class="input-container">
+        <span class="prompt-symbol">balltvsa@root:~$</span>
+        <input type="text" id="command-input" autofocus autocomplete="off" spellcheck="false">
+    </div>
+
+    <script>
+        const terminalBody = document.getElementById('terminal-body');
+        const commandInput = document.getElementById('command-input');
+
+        // อัปเดตนาฬิกา
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('th-TH');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // โฟกัสช่องพิมพ์ตลอดเวลา
+        document.addEventListener('click', () => {
+            commandInput.focus();
+        });
+
+        // จัดการการพิมพ์คำสั่ง
+        commandInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                const cmd = commandInput.value.trim();
+                if (cmd !== '') {
+                    appendOutput(`balltvsa@root:~$ ${cmd}`, 'prompt');
+                    processCommand(cmd.toLowerCase());
+                    commandInput.value = '';
+                }
+            }
+        });
+
+        function appendOutput(text, type = 'normal') {
+            const div = document.createElement('div');
+            div.className = 'output-line';
+            div.innerHTML = text;
+            terminalBody.appendChild(div);
+            terminalBody.scrollTop = terminalBody.scrollHeight;
+        }
+
+        // ระบบแปลคำสั่ง
+        function processCommand(cmd) {
+            switch (cmd) {
+                case 'help':
+                    appendOutput(`Available commands:
+  <span class="highlight">about</span>    - ดูข้อมูลเกี่ยวกับเจ้าของเว็บ
+  <span class="highlight">skills</span>   - ดูสกิลและสิ่งที่กำลังทำอยู่
+  <span class="highlight">secret</span>   - คำสั่งลับห้ามกด!
+  <span class="highlight">clear</span>    - ล้างหน้าจอ Terminal
+  <span class="highlight">ping</span>     - ทดสอบการเชื่อมต่อเซิร์ฟเวอร์
+  <span class="highlight">date</span>     - แสดงวันที่และเวลาปัจจุบัน`);
+                    break;
+
+                case 'about':
+                    appendOutput(`System Owner: <span class="highlight">บอล (BallTVSA)</span>
+Domain: Balltvsa.com
+Status: กำลังเขียนโค้ดด้วยความง่วงและพลังแห่งความเท่ 😎`);
+                    break;
+
+                case 'skills':
+                    appendOutput(`Hardware & Software Stack:
+- IoT: ESP32, Sensors (DHT22, GPS, Accelerometer), SIM800L/A7670C
+- Servers: Raspberry Pi (Pi67), Node.js, Express, Cloudflare Tunnels
+- Web: HTML/CSS, JavaScript, MediaPipe
+- Languages: C++, Python, JavaScript`);
+                    break;
+
+                case 'secret':
+                    appendOutput(`🎉 ตู้มมม! คุณเจอ Easter Egg ลับเข้าให้แล้ว ไม่มีอะไรหรอก แค่อยากบอกว่าเว็บนี้เจ๋งดี 5555`);
+                    break;
+
+                case 'clear':
+                    terminalBody.innerHTML = '';
+                    break;
+
+                case 'ping':
+                    appendOutput(`PING Balltvsa.com (185.199.108.153): 56 data bytes
+64 bytes from 185.199.108.153: icmp_seq=1 ttl=54 time=12.4 ms
+64 bytes from 185.199.108.153: icmp_seq=2 ttl=54 time=11.8 ms
+<span class="highlight">--- Balltvsa.com ping statistics ---</span>
+2 packets transmitted, 2 packets received, 0.0% packet loss`);
+                    break;
+
+                case 'date':
+                    appendOutput(`Current Date & Time: ${new Date().toLocaleString('th-TH')}`);
+                    break;
+
+                case 'sudo rm -rf /':
+                case 'rm -rf /':
+                    appendOutput(`<span style="color: #ff5f56;">Nice try! ระบบไม่อนุญาตให้คุณพังตัวเอง 5555</span>`);
+                    break;
+
+                default:
+                    appendOutput(`zsh: command not found: ${cmd}. Type <span class="highlight">'help'</span> for help.`);
+                    break;
+            }
+            appendOutput(''); // เว้นบรรทัด
+        }
+    </script>
+</body>
+</html>
