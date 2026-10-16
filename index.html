@@ -12,20 +12,26 @@
 <body>
 
   <div class="container">
-    <div class="icon">🛠️</div>
-    <h1>กำลังก่อสร้าง Web</h1>
-    <p class="subtitle">อยู่ในช่วงใช้ความคิด</p>
+    <div class="icon">🛠️</div><br>
+    <h1>⚠️ กำลังก่อสร้าง Web ⚠️</h1>
+    <p class="subtitle">🚨 อยู่ในช่วงใช้ความคิด 🧠</p>
 
     <!-- ฟอร์มส่งไอเดีย -->
     <form id="ideaForm">
       <label for="ideaText" class="form-label">ส่งไอเดียได้ (ถ้ามี):</label>
-      <textarea id="ideaText" rows="4" required placeholder="อยากให้เว็บมีฟีเจอร์อะไร..."></textarea>
-      <button type="submit" id="submitBtn">ส่งไอเดีย 🚀</button>
+      <textarea id="ideaText" rows="4" required placeholder="อยากให้เว็บเป็นเว็ปอะไรดี...."></textarea>
+      <button type="submit" id="submitBtn">Submit</button>
     </form>
 
     <!-- ข้อความแจ้งเตือนสถานะ -->
     <p id="statusMsg" class="status-msg"></p>
   </div>
+
+  <!-- Angle Grinder -->
+  <img id="grinder" src="grinder.png" alt="angle grinder" draggable="false">
+  <canvas id="sparks"></canvas>
+  <audio id="grinderSound" src="/Angle Grinder Sound Effect (HD).mp3" loop preload="auto"></audio>
+  <script src="grinder.js"></script>
 
   <script>
     // ตั้งค่าการเชื่อมต่อ Supabase ของคุณ
