@@ -174,26 +174,49 @@ html, body {
 .calendar-board { display: flex; flex-direction: column; margin-top: 24px; flex: 1; }
 .weekdays-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); font-size: 0.75rem; font-weight: 600; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.04em; padding-bottom: 12px; border-bottom: 1px solid var(--border); text-align: center; }
 .days-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-left: 1px solid var(--border); border-top: 1px solid var(--border); flex: 1; }
-.cell { min-height: 100px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; align-items: flex-start; cursor: pointer; transition: background-color 0.15s ease; background-color: var(--bg-surface); position: relative; }
+.cell { min-height: 120px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 8px 10px; display: flex; flex-direction: column; align-items: stretch; cursor: pointer; transition: background-color 0.15s ease; background-color: var(--bg-surface); position: relative; }
 .cell:hover { background-color: #fafafa; }
 .cell.empty { background-color: #fcfcfc; cursor: default; }
 .cell.is-today { background-color: #f0fdf4; }
 .cell.is-today .cell-num { color: var(--color-green); font-weight: 700; }
-.cell-num { font-size: 0.95rem; font-weight: 500; color: var(--text-main); }
+.cell-num { font-size: 0.95rem; font-weight: 500; color: var(--text-main); margin-bottom: 4px; }
 
-/* Multi-day Event Bar */
-.event-dots { display: flex; flex-direction: column; gap: 2px; margin-top: auto; padding-top: 8px; width: 100%; }
-.event-dash-container { display: flex; width: 100%; gap: 0; height: 6px; }
-.event-dash { height: 6px; background-color: var(--color-purple); flex: 1; }
-.event-dash.start-cap { border-top-left-radius: 3px; border-bottom-left-radius: 3px; margin-left: 2px; }
-.event-dash.end-cap { border-top-right-radius: 3px; border-bottom-right-radius: 3px; margin-right: 2px; }
-.event-dash.single-cap { border-radius: 3px; margin: 0 2px; }
-.event-dash.dash-purple { background-color: var(--color-purple); }
-.event-dash.dash-blue { background-color: var(--color-blue); }
-.event-dash.dash-green { background-color: var(--color-green); }
-.event-dash.dash-orange { background-color: var(--color-orange); }
-.event-dash.dash-red { background-color: var(--color-red); }
-.event-dash-more { font-size: 0.65rem; color: var(--text-sub); font-weight: 600; margin-left: 4px; line-height: 1; }
+/* ✅ Multi-day Event Bar (Stacked & Connected) */
+.event-stack { display: flex; flex-direction: column; gap: 2px; width: 100%; overflow: hidden; } /* ลด gap ลงเป็น 2px */
+.event-bar { 
+  height: 8px; 
+  width: 100%; 
+  background-color: var(--color-purple); 
+  border-radius: 4px;
+  position: relative;
+}
+.event-bar.bar-purple { background-color: var(--color-purple); }
+.event-bar.bar-blue { background-color: var(--color-blue); }
+.event-bar.bar-green { background-color: var(--color-green); }
+.event-bar.bar-orange { background-color: var(--color-orange); }
+.event-bar.bar-red { background-color: var(--color-red); }
+
+/* ✅ ทำให้เส้นเชื่อมต่อกันแบบไม่มีช่องว่าง */
+.cell:not(.empty) .event-bar {
+  border-radius: 0;
+}
+/* วันแรกของ Event */
+.event-bar.start-cap {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+  margin-left: 4px;
+}
+/* วันสุดท้ายของ Event */
+.event-bar.end-cap {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+  margin-right: 4px;
+}
+/* ถ้าจบในวันเดียว */
+.event-bar.single-cap {
+  border-radius: 4px;
+  margin: 0 4px;
+}
 
 /* Day Detail */
 .day-badge-header { display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -219,7 +242,25 @@ html, body {
 .time-content { flex: 1; height: 100%; position: relative; box-sizing: border-box; transition: background-color 0.1s ease; }
 .time-content.ui-droppable-hover { background-color: rgba(59, 130, 246, 0.08); }
 
-.event-sticker-block { position: absolute; border-left: 4px solid rgba(0,0,0,0.2); border-radius: 6px; padding: 6px 12px; font-size: 0.78rem; z-index: 10; overflow: hidden; transition: transform 0.15s ease, box-shadow 0.15s ease; border-top: 1px solid rgba(255, 255, 255, 0.3); border-bottom: 1px solid rgba(0, 0, 0, 0.1); cursor: default; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-start; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+/* ✅ Event Sticker Block (แก้เรื่อง gap) */
+.event-sticker-block { 
+  position: absolute; 
+  border-left: 4px solid rgba(0,0,0,0.2); 
+  border-radius: 6px; 
+  padding: 6px 12px; 
+  font-size: 0.78rem; 
+  z-index: 10; 
+  overflow: hidden; 
+  transition: transform 0.15s ease, box-shadow 0.15s ease; 
+  border-top: 1px solid rgba(255, 255, 255, 0.3); 
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1); 
+  cursor: default; 
+  box-sizing: border-box; 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: flex-start; 
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+}
 .sticker-purple { background: #8b5cf6; color: #fff; }
 .sticker-blue { background: #3b82f6; color: #fff; }
 .sticker-green { background: #10b981; color: #fff; }
