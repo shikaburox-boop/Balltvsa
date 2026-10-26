@@ -392,129 +392,174 @@ $(document).ready(function () {
   });
 
   // ==========================================================
-  // ✅ CUSTOM TIME PICKER LOGIC
+  // ✅ CUSTOM TIME PICKER LOGIC (24 ชั่วโมง / ลากเมาส์ / พิมพ์ตัวเลขได้)
   // ==========================================================
   let tpTargetInputId = null;
+  const TP_ITEM_H = 40;
+  const wheelInputs = { wheelHour: "#tpHourInput", wheelMinute: "#tpMinInput" };
 
-  function populateHours() {
-    let $wheel = $("#wheelHour");
+  function populateWheel($wheel, count) {
     $wheel.find(".tp-wheel-item").remove();
-    for (let i = 1; i <= 12; i++) {
-      let val = String(i).padStart(2, '0');
-      $wheel.find(".tp-wheel-spacer").eq(1).before(`<div class="tp-wheel-item" data-val="${val}">${val}</div>`);
+    let html = "";
+    for (let i = 0; i < count; i++) {
+      let v = pad2(i);
+      html += `<div class="tp-wheel-item" data-val="${v}">${v}</div>`;
     }
+    $wheel.find(".tp-wheel-spacer").eq(1).before(html);
+  }
+  populateWheel($("#wheelHour"), 24);
+  populateWheel($("#wheelMinute"), 60);
+
+  function wheelIndex($wheel) {
+    let n = $wheel.find(".tp-wheel-item").length;
+    let idx = Math.round($wheel.scrollTop() / TP_ITEM_H);
+    return Math.max(0, Math.min(n - 1, idx));
   }
 
-  function populateMinutes() {
-    let $wheel = $("#wheelMinute");
-    $wheel.find(".tp-wheel-item").remove();
-    for (let i = 0; i < 60; i++) {
-      let val = String(i).padStart(2, '0');
-      $wheel.find(".tp-wheel-spacer").eq(1).before(`<div class="tp-wheel-item" data-val="${val}">${val}</div>`);
-    }
+  function highlightWheel($wheel, idx) {
+    $wheel.find(".tp-wheel-item").removeClass("tp-active").eq(idx).addClass("tp-active");
   }
 
-  populateHours();
-  populateMinutes();
-
-  function scrollToValue($wheel, value) {
-    let $items = $wheel.find(".tp-wheel-item");
-    let $item = $items.filter(`[data-val="${value}"]`);
-    if ($item.length) {
-      // ใช้ลำดับในกลุ่ม item เท่านั้น (ไม่นับ spacer) ไม่งั้นเลื่อนเลยไป 1 ช่อง
-      let scrollPos = $items.index($item) * 40;
-      $wheel.scrollTop(scrollPos);
-      $item.addClass("tp-active").siblings(".tp-wheel-item").removeClass("tp-active");
-    }
+  function scrollWheelTo($wheel, idx, smooth) {
+    let n = $wheel.find(".tp-wheel-item").length;
+    idx = Math.max(0, Math.min(n - 1, idx));
+    $wheel[0].scrollTo({ top: idx * TP_ITEM_H, behavior: smooth ? "smooth" : "auto" });
+    highlightWheel($wheel, idx);
   }
 
-  function updateWheelHighlight($wheel, displayId, isAmPm) {
-    let scrollTop = $wheel.scrollTop();
-    let index = Math.round(scrollTop / 40); 
-    let $items = $wheel.find(".tp-wheel-item");
-    
-    $items.removeClass("tp-active");
-    let $active = $items.eq(index);
-    $active.addClass("tp-active");
-
-    let val = $active.data("val");
-    if (val) {
-      $(displayId).text(val);
-    }
-  }
-
-  $(document).on("click", "#eventStartTime, #eventEndTime", function(e) {
-    e.preventDefault();
-    tpTargetInputId = "#" + $(this).attr("id");
-    
-    let currentVal = $(this).val(); 
-    let h = "09", m = "00", ampm = "AM";
-    
-    if (currentVal) {
-      let parts = currentVal.split(":");
-      let hour24 = parseInt(parts[0], 10);
-      m = parts[1];
-      
-      if (hour24 >= 12) {
-        ampm = "PM";
-        if (hour24 > 12) hour24 -= 12;
-      } else {
-        ampm = "AM";
-        if (hour24 === 0) hour24 = 12;
-      }
-      h = String(hour24).padStart(2, '0');
-    } else {
-      h = "09"; m = "00"; ampm = "AM";
-    }
-
-    $("#tpHourDisplay").text(h);
-    $("#tpMinDisplay").text(m);
-    $("#tpAmPmDisplay").text(ampm);
-
-    setTimeout(() => {
-      scrollToValue($("#wheelHour"), h);
-      scrollToValue($("#wheelMinute"), m);
-      scrollToValue($("#wheelAmPm"), ampm);
-    }, 50); 
-
-    $("#timePickerModal").css("display", "flex");
+  // เลื่อนวงล้อ (เมาส์ล้อ/ลาก/แตะ) → อัปเดตตัวเลขด้านบน (ยกเว้นตอนกำลังพิมพ์ช่องนั้นอยู่)
+  $(".tp-wheel").on("scroll", function () {
+    let idx = wheelIndex($(this));
+    highlightWheel($(this), idx);
+    let $inp = $(wheelInputs[this.id]);
+    if (!$inp.is(":focus")) $inp.val(pad2(idx));
   });
 
-  $(".tp-wheel").scroll(function() {
-    let scrollTop = $(this).scrollTop();
-    let index = Math.round(scrollTop / 40);
-    let $items = $(this).find(".tp-wheel-item");
-    
-    $items.removeClass("tp-active");
-    let $active = $items.eq(index);
-    $active.addClass("tp-active");
+  // ---- ลากวงล้อด้วยเมาส์ ----
+  let tpDrag = null;
+  let tpLastDragEnd = 0;
 
-    let val = $active.data("val");
-    if ($(this).attr("id") === "wheelHour") {
-      $("#tpHourDisplay").text(val);
-    } else if ($(this).attr("id") === "wheelMinute") {
-      $("#tpMinDisplay").text(val);
-    } else if ($(this).attr("id") === "wheelAmPm") {
-      $("#tpAmPmDisplay").text(val);
+  $(".tp-wheel").on("mousedown", function (e) {
+    if (e.button !== 0) return;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    tpDrag = { $w: $(this), startY: e.clientY, startTop: this.scrollTop, moved: false };
+    $(this).addClass("tp-dragging");
+    e.preventDefault();
+  });
+
+  $(document).on("mousemove", function (e) {
+    if (!tpDrag) return;
+    let dy = e.clientY - tpDrag.startY;
+    if (Math.abs(dy) > 3) tpDrag.moved = true;
+    tpDrag.$w[0].scrollTop = tpDrag.startTop - dy;
+  });
+
+  $(document).on("mouseup", function () {
+    if (!tpDrag) return;
+    let $w = tpDrag.$w;
+    let moved = tpDrag.moved;
+    tpDrag = null;
+    $w.removeClass("tp-dragging");
+    if (moved) {
+      tpLastDragEnd = Date.now();
+      scrollWheelTo($w, wheelIndex($w), true);
     }
+  });
+
+  // ใช้ล้อเมาส์เลื่อนวงล้อ → เลิกโฟกัสช่องพิมพ์
+  $(".tp-wheel").on("wheel", function () {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  });
+
+  // คลิกที่ตัวเลขในวงล้อ → เลื่อนมาที่ตัวเลขนั้น
+  $(document).on("click", ".tp-wheel-item", function () {
+    if (Date.now() - tpLastDragEnd < 250) return; // เพิ่งลากเสร็จ ไม่ถือว่าคลิก
+    let $w = $(this).closest(".tp-wheel");
+    scrollWheelTo($w, $w.find(".tp-wheel-item").index(this), true);
+  });
+
+  // ---- พิมพ์ตัวเลขในช่องชั่วโมง/นาที ----
+  $(".tp-time-input").on("focus", function () {
+    let el = this;
+    setTimeout(() => el.select(), 0);
+  });
+
+  $(".tp-time-input").on("input", function () {
+    let isHour = this.id === "tpHourInput";
+    let max = isHour ? 23 : 59;
+    let v = this.value.replace(/\D/g, "").slice(0, 2);
+    if (v !== "") {
+      let n = parseInt(v, 10);
+      if (n > max) { n = max; v = pad2(n); }
+      scrollWheelTo(isHour ? $("#wheelHour") : $("#wheelMinute"), n, false);
+      if (isHour && v.length === 2) {
+        this.value = v;
+        $("#tpMinInput").focus();
+        return;
+      }
+    }
+    this.value = v;
+  });
+
+  $(".tp-time-input").on("blur", function () {
+    let isHour = this.id === "tpHourInput";
+    let max = isHour ? 23 : 59;
+    let n = parseInt(this.value, 10);
+    if (isNaN(n)) n = 0;
+    n = Math.max(0, Math.min(max, n));
+    this.value = pad2(n);
+    scrollWheelTo(isHour ? $("#wheelHour") : $("#wheelMinute"), n, false);
+  });
+
+  $(".tp-time-input").on("keydown", function (e) {
+    let isHour = this.id === "tpHourInput";
+    let max = isHour ? 23 : 59;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      $("#tpDoneBtn").click();
+    } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      let n = parseInt(this.value, 10) || 0;
+      n += (e.key === "ArrowUp") ? 1 : -1;
+      if (n > max) n = 0;
+      if (n < 0) n = max;
+      this.value = pad2(n);
+      scrollWheelTo(isHour ? $("#wheelHour") : $("#wheelMinute"), n, false);
+      this.select();
+    }
+  });
+
+  // ---- เปิดตัวเลือกเวลา ----
+  $(document).on("click", "#eventStartTime, #eventEndTime", function (e) {
+    e.preventDefault();
+    tpTargetInputId = "#" + $(this).attr("id");
+
+    let h = 9, m = 0;
+    let currentVal = $(this).val();
+    if (currentVal && /^\d{1,2}:\d{2}$/.test(currentVal)) {
+      [h, m] = currentVal.split(":").map(Number);
+    }
+
+    $("#tpHourInput").val(pad2(h));
+    $("#tpMinInput").val(pad2(m));
+    $("#timePickerModal").css("display", "flex");
+
+    scrollWheelTo($("#wheelHour"), h, false);
+    scrollWheelTo($("#wheelMinute"), m, false);
+    setTimeout(() => {
+      scrollWheelTo($("#wheelHour"), h, false);
+      scrollWheelTo($("#wheelMinute"), m, false);
+    }, 50);
   });
 
   // กด Done หรือแตะพื้นหลัง = บันทึกเวลา
-  $(".tp-overlay, #tpDoneBtn").click(function() {
-    let h = $("#tpHourDisplay").text();
-    let m = $("#tpMinDisplay").text();
-    let ampm = $("#tpAmPmDisplay").text();
+  $(".tp-overlay, #tpDoneBtn").click(function () {
+    let h = Math.max(0, Math.min(23, parseInt($("#tpHourInput").val(), 10) || 0));
+    let m = Math.max(0, Math.min(59, parseInt($("#tpMinInput").val(), 10) || 0));
 
-    let hour24 = parseInt(h, 10);
-    if (ampm === "PM" && hour24 !== 12) hour24 += 12;
-    if (ampm === "AM" && hour24 === 12) hour24 = 0;
-
-    let finalTime = `${String(hour24).padStart(2, '0')}:${m}`;
-    
     if (tpTargetInputId) {
-      $(tpTargetInputId).val(finalTime);
+      $(tpTargetInputId).val(`${pad2(h)}:${pad2(m)}`);
     }
-
     $("#timePickerModal").hide();
   });
 });
@@ -938,73 +983,75 @@ function initDraggablesAndDroppables() {
     if (!$(this).hasClass("ui-draggable")) {
       $(this).draggable({
         helper: "clone",
+        appendTo: "body",
         revert: "invalid",
         cursor: "move",
         zIndex: 9999,
-        cancel: ".btn-del-sticker"
+        cancel: ".btn-del-sticker",
+        start: function () { $("#timelineGrid").addClass("is-dragging"); },
+        stop: function () { $("#timelineGrid").removeClass("is-dragging"); }
       });
     }
   });
 
-  $(document).on("mouseenter", ".time-content", function () {
-    if (!$(this).hasClass("ui-droppable")) {
-      $(this).droppable({
-        accept: ".draggable-chip",
-        hoverClass: "ui-droppable-hover",
-        drop: function (event, ui) {
-          if (!currentUserId) {
-            alert("Please sign in with Google first to drop events.");
-            return;
-          }
-          if (!selectedDateStr) return;
+  // ตั้ง droppable ให้ทุกช่องเวลาตั้งแต่ต้น (เดิมตั้งตอนเมาส์ชี้ช่อง ซึ่งช่องที่ถูก event เต็มวันบังอยู่จะไม่เคยถูกตั้ง)
+  // tolerance: "pointer" = ดูจากตำแหน่งเมาส์ ไม่สนว่ามี event บังอยู่ และไม่ลงหลายช่องพร้อมกัน
+  $(".time-content").droppable({
+    accept: ".draggable-chip",
+    tolerance: "pointer",
+    hoverClass: "ui-droppable-hover",
+    drop: function (event, ui) {
+      if (!currentUserId) {
+        alert("Please sign in with Google first to drop events.");
+        return;
+      }
+      if (!selectedDateStr) return;
 
-          let targetTimeStr = String($(this).data("time-slot"));
-          let title = String(ui.draggable.attr("data-title"));
-          let duration = parseFloat(ui.draggable.attr("data-duration")) || 1;
-          let details = ui.draggable.attr("data-details") || "";
-          let color = ui.draggable.attr("data-color") || "purple";
+      let targetTimeStr = String($(this).data("time-slot"));
+      let title = String(ui.draggable.attr("data-title"));
+      let duration = parseFloat(ui.draggable.attr("data-duration")) || 1;
+      let details = ui.draggable.attr("data-details") || "";
+      let color = ui.draggable.attr("data-color") || "purple";
 
-          let [h, m] = targetTimeStr.split(":");
-          let formattedTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      let [h, m] = targetTimeStr.split(":");
+      let formattedTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 
-          let startMinutes = parseInt(h) * 60 + parseInt(m);
-          let endMinutes = Math.round(startMinutes + duration * 60);
+      let startMinutes = parseInt(h) * 60 + parseInt(m);
+      let endMinutes = Math.round(startMinutes + duration * 60);
 
-          // ถ้าเกินเที่ยงคืน ให้ไปจบวันถัดไป (เดิมใช้ % 24 ทำให้เวลาจบน้อยกว่าเวลาเริ่ม)
-          let endDateStr = selectedDateStr;
-          if (endMinutes >= 1440) {
-            endDateStr = addDaysStr(selectedDateStr, Math.floor(endMinutes / 1440));
-            endMinutes = endMinutes % 1440;
-          }
-          let formattedEndTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
+      // ถ้าเกินเที่ยงคืน ให้ไปจบวันถัดไป
+      let endDateStr = selectedDateStr;
+      if (endMinutes >= 1440) {
+        endDateStr = addDaysStr(selectedDateStr, Math.floor(endMinutes / 1440));
+        endMinutes = endMinutes % 1440;
+      }
+      let formattedEndTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
 
-          let newEventData = {
-            userId: currentUserId,
-            date: selectedDateStr,
-            endDate: endDateStr,
-            time: formattedTime,
-            endTime: formattedEndTime,
-            duration: duration,
-            title: title,
-            details: details,
-            color: color,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-          };
+      let newEventData = {
+        userId: currentUserId,
+        date: selectedDateStr,
+        endDate: endDateStr,
+        time: formattedTime,
+        endTime: formattedEndTime,
+        duration: duration,
+        title: title,
+        details: details,
+        color: color,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
 
-          db.collection("events").add(newEventData)
-            .then((docRef) => {
-              newEventData.id = docRef.id;
-              appointments.push(newEventData);
+      db.collection("events").add(newEventData)
+        .then((docRef) => {
+          newEventData.id = docRef.id;
+          appointments.push(newEventData);
 
-              renderCalendar();
-              renderAgendaList();
-              showDayDetail(selectedDateStr);
-            })
-            .catch((error) => {
-              console.error("Error adding dropped event: ", error);
-            });
-        }
-      });
+          renderCalendar();
+          renderAgendaList();
+          showDayDetail(selectedDateStr);
+        })
+        .catch((error) => {
+          console.error("Error adding dropped event: ", error);
+        });
     }
   });
 }
