@@ -51,19 +51,27 @@
       <!-- Main Event Form -->
       <section class="form-section">
         <form id="appointmentForm" class="entry-form">
-          <div class="field">
-            <label for="eventDate">Active Date</label>
-            <input type="date" id="eventDate" required>
+          
+          <div class="field-row">
+            <div class="field">
+              <label for="eventDate">Start Date</label>
+              <input type="text" id="eventDate" placeholder="Select date" readonly required>
+            </div>
+            <div class="field">
+              <label for="eventEndDate">End Date</label>
+              <input type="text" id="eventEndDate" placeholder="Select date" readonly>
+            </div>
           </div>
 
           <div class="field-row">
             <div class="field">
               <label for="eventStartTime">Start Time</label>
-              <input type="time" id="eventStartTime" value="09:00" step="60" required>
+              <!-- ✅ Custom Time Picker Trigger -->
+              <input type="text" id="eventStartTime" placeholder="Select time" readonly required>
             </div>
             <div class="field">
               <label for="eventEndTime">End Time</label>
-              <input type="time" id="eventEndTime" value="10:00" step="60" required>
+              <input type="text" id="eventEndTime" placeholder="Select time" readonly required>
             </div>
           </div>
           
@@ -77,30 +85,14 @@
             <input type="text" id="eventDetails" placeholder="Room, link, or extra info" autocomplete="off">
           </div>
 
-          <!-- ✅ วงกลมสีที่เล็กลง -->
           <div class="field">
             <label>Color Tag</label>
             <div class="color-picker">
-              <label class="color-option">
-                <input type="radio" name="eventColor" value="purple" checked>
-                <span class="color-swatch color-purple" title="Purple"></span>
-              </label>
-              <label class="color-option">
-                <input type="radio" name="eventColor" value="blue">
-                <span class="color-swatch color-blue" title="Blue"></span>
-              </label>
-              <label class="color-option">
-                <input type="radio" name="eventColor" value="green">
-                <span class="color-swatch color-green" title="Green"></span>
-              </label>
-              <label class="color-option">
-                <input type="radio" name="eventColor" value="orange">
-                <span class="color-swatch color-orange" title="Orange"></span>
-              </label>
-              <label class="color-option">
-                <input type="radio" name="eventColor" value="red">
-                <span class="color-swatch color-red" title="Red"></span>
-              </label>
+              <label class="color-option"><input type="radio" name="eventColor" value="purple" checked><span class="color-swatch color-purple"></span></label>
+              <label class="color-option"><input type="radio" name="eventColor" value="blue"><span class="color-swatch color-blue"></span></label>
+              <label class="color-option"><input type="radio" name="eventColor" value="green"><span class="color-swatch color-green"></span></label>
+              <label class="color-option"><input type="radio" name="eventColor" value="orange"><span class="color-swatch color-orange"></span></label>
+              <label class="color-option"><input type="radio" name="eventColor" value="red"><span class="color-swatch color-red"></span></label>
             </div>
           </div>
 
@@ -115,7 +107,6 @@
           <button id="toggleStickerFormBtn" class="btn-icon" type="button" title="Create sticker">+</button>
         </div>
 
-        <!-- Mini Form for creating stickers -->
         <form id="stickerForm" class="sticker-form" style="display: none;">
           <input type="text" id="stickerTitle" placeholder="Sticker title" required>
           <input type="text" id="stickerDetails" placeholder="Notes (optional)">
@@ -124,47 +115,24 @@
             <div class="field" style="flex: 1; margin-bottom: 0;">
               <label style="font-size: 0.65rem; margin-bottom: 2px;">Hours</label>
               <select id="stickerHours" class="color-select-small">
-                <option value="0">0</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
+                <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
               </select>
             </div>
             <div class="field" style="flex: 1; margin-bottom: 0;">
               <label style="font-size: 0.65rem; margin-bottom: 2px;">Minutes</label>
               <select id="stickerMinutes" class="color-select-small">
-                <option value="0">00</option>
-                <option value="15">15</option>
-                <option value="30">30</option>
-                <option value="45">45</option>
+                <option value="0">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option>
               </select>
             </div>
           </div>
 
-          <!-- ✅ Quick Sticker วงกลมสีเล็ก -->
           <div class="field" style="margin-bottom: 6px;">
             <div class="color-picker" style="justify-content: space-between; padding: 0 4px;">
-              <label class="color-option">
-                <input type="radio" name="stickerColor" value="purple" checked>
-                <span class="color-swatch color-purple"></span>
-              </label>
-              <label class="color-option">
-                <input type="radio" name="stickerColor" value="blue">
-                <span class="color-swatch color-blue"></span>
-              </label>
-              <label class="color-option">
-                <input type="radio" name="stickerColor" value="green">
-                <span class="color-swatch color-green"></span>
-              </label>
-              <label class="color-option">
-                <input type="radio" name="stickerColor" value="orange">
-                <span class="color-swatch color-orange"></span>
-              </label>
-              <label class="color-option">
-                <input type="radio" name="stickerColor" value="red">
-                <span class="color-swatch color-red"></span>
-              </label>
+              <label class="color-option"><input type="radio" name="stickerColor" value="purple" checked><span class="color-swatch color-purple"></span></label>
+              <label class="color-option"><input type="radio" name="stickerColor" value="blue"><span class="color-swatch color-blue"></span></label>
+              <label class="color-option"><input type="radio" name="stickerColor" value="green"><span class="color-swatch color-green"></span></label>
+              <label class="color-option"><input type="radio" name="stickerColor" value="orange"><span class="color-swatch color-orange"></span></label>
+              <label class="color-option"><input type="radio" name="stickerColor" value="red"><span class="color-swatch color-red"></span></label>
             </div>
           </div>
 
@@ -174,19 +142,24 @@
         <div class="preset-chips" id="presetChipsContainer"></div>
       </section>
 
-      <!-- Agenda -->
+      <!-- Agenda Section -->
       <section class="agenda-section">
-        <div class="section-head">
-          <span>Upcoming Agenda</span>
-          <span id="eventCount" class="count-tag">0</span>
+        <div class="section-head" style="margin-top: 8px;">
+          <span>Ongoing</span>
+          <span id="ongoingCount" class="count-tag">0</span>
         </div>
-        <ul id="eventList" class="agenda-list"></ul>
+        <ul id="ongoingList" class="agenda-list" style="max-height: 120px;"></ul>
+
+        <div class="section-head" style="margin-top: 12px;">
+          <span>Upcoming</span>
+          <span id="upcomingCount" class="count-tag">0</span>
+        </div>
+        <ul id="upcomingList" class="agenda-list"></ul>
       </section>
     </aside>
 
     <!-- Main Calendar -->
     <main class="calendar-view">
-      <!-- Month View -->
       <div id="monthView" class="view-panel active">
         <header class="calendar-toolbar">
           <h1 id="monthYearDisplay" class="month-title">—</h1>
@@ -205,7 +178,6 @@
         </div>
       </div>
 
-      <!-- Day View -->
       <div id="dayDetailView" class="view-panel" style="display: none;">
         <header class="day-toolbar">
           <button id="backToMonthBtn" class="btn-nav" type="button">← Back to Month</button>
@@ -222,6 +194,54 @@
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- ✅ Custom Date Picker Modal -->
+  <div id="datePickerModal" class="dp-modal">
+    <div class="dp-overlay"></div>
+    <div class="dp-content">
+      <div class="dp-header">
+        <button type="button" class="dp-prev">&lsaquo;</button>
+        <span id="dpMonthYear">October 2026</span>
+        <button type="button" class="dp-next">&rsaquo;</button>
+      </div>
+      <div class="dp-weekdays">
+        <div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div>
+      </div>
+      <div id="dpDays" class="dp-days"></div>
+    </div>
+  </div>
+
+  <!-- ✅ Custom Time Picker Modal (Wheel Style) -->
+  <div id="timePickerModal" class="tp-modal">
+    <div class="tp-overlay"></div>
+    <div class="tp-content">
+      <div class="tp-display">
+        <span id="tpHourDisplay">04</span><span class="tp-colon">:</span><span id="tpMinDisplay">00</span><span id="tpAmPmDisplay" class="tp-ampm">AM</span>
+      </div>
+      <div class="tp-wheel-container">
+        <div class="tp-highlight-bar"></div>
+        
+        <div class="tp-wheel" id="wheelHour">
+          <div class="tp-wheel-spacer"></div>
+          <div class="tp-wheel-spacer"></div>
+        </div>
+        
+        <div class="tp-wheel-colon">:</div>
+
+        <div class="tp-wheel" id="wheelMinute">
+          <div class="tp-wheel-spacer"></div>
+          <div class="tp-wheel-spacer"></div>
+        </div>
+
+        <div class="tp-wheel" id="wheelAmPm">
+          <div class="tp-wheel-spacer"></div>
+          <div class="tp-wheel-item" data-val="AM">AM</div>
+          <div class="tp-wheel-item" data-val="PM">PM</div>
+          <div class="tp-wheel-spacer"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="script.js"></script>
