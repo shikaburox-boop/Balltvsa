@@ -21,6 +21,7 @@ let quickStickers = [];
 let currentDate = new Date();
 let selectedDateStr = "";
 let currentUserId = null;
+let firstEventMinutes = null;
 
 const monthNames = [
   "January", "February", "March", "April", "May", "June",
@@ -39,6 +40,28 @@ function timeToMinutes(timeStr) {
   return h * 60 + m;
 }
 
+// กัน XSS / ข้อความที่มี " หรือ < ทำ HTML พัง
+function escapeHtml(str) {
+  return String(str == null ? "" : str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function formatDateStr(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function addDaysStr(dateStr, n) {
+  let d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return formatDateStr(d);
+}
+
 const availableColors = ["purple", "blue", "green", "orange", "red"];
 function getRandomColor() {
   return availableColors[Math.floor(Math.random() * availableColors.length)];
@@ -55,15 +78,21 @@ $(document).ready(function () {
   initDraggablesAndDroppables();
 
   // ---- Month navigation ----
+  // ต้อง setDate(1) ก่อน ไม่งั้นวันที่ 29-31 จะข้ามเดือน (เช่น 31 ต.ค. → "31 พ.ย." = 1 ธ.ค.)
   $("#prevBtn").click(function () {
+    currentDate.setDate(1);
     currentDate.setMonth(currentDate.getMonth() - 1);
     renderCalendar();
   });
 
   $("#nextBtn").click(function () {
+    currentDate.setDate(1);
     currentDate.setMonth(currentDate.getMonth() + 1);
     renderCalendar();
   });
+
+  // อัปเดต Ongoing/Upcoming ทุกนาที
+  setInterval(renderAgendaList, 60000);
 
   // ---- Back to Month View ----
   $("#backToMonthBtn").click(function () {
@@ -71,6 +100,7 @@ $(document).ready(function () {
     $("#monthView").fadeIn(150);
     selectedDateStr = "";
     $("#eventDate").val("");
+    $("#eventEndDate").val("");
     $("#dragPresetsSection").hide();
     $("#stickerForm").hide();
   });
@@ -106,12 +136,13 @@ $(document).ready(function () {
 
     if (!titleVal) return;
 
-    let startMinutes = timeToMinutes(startTimeVal);
-    let endMinutes = timeToMinutes(endTimeVal);
-    let durationVal = (endMinutes - startMinutes) / 60;
+    // เทียบเป็นวัน+เวลาเต็ม (ข้ามวันได้ เช่น จ. 22:00 → อ. 06:00)
+    let startDT = new Date(`${dateVal}T${startTimeVal}`);
+    let endDT = new Date(`${endDateVal}T${endTimeVal}`);
+    let durationVal = (endDT - startDT) / 3600000;
 
     if (durationVal <= 0) {
-      alert("End time must be later than start time.");
+      alert("End must be later than start.");
       return;
     }
 
@@ -241,6 +272,7 @@ $(document).ready(function () {
     $("#monthView").hide();
     $("#dayDetailView").fadeIn(150);
     $("#dragPresetsSection").show();
+    scrollTimelineToFocus();
   });
 
   // ---- Delete Quick Sticker ----
@@ -335,18 +367,26 @@ $(document).ready(function () {
     let selectedDate = $(this).data("date");
     if (dpTargetInputId) {
       $(dpTargetInputId).val(selectedDate);
+
+      // เลือกวันเริ่มหลังวันจบ → ดันวันจบตาม / ไม่มีวันจบ → ใช้วันเดียวกัน
+      if (dpTargetInputId === "#eventDate") {
+        let endVal = $("#eventEndDate").val();
+        if (!endVal || endVal < selectedDate) $("#eventEndDate").val(selectedDate);
+      }
     }
     $("#datePickerModal").hide();
   });
 
   $(".dp-prev").click(function(e) {
     e.stopPropagation();
+    dpCurrentDate.setDate(1);
     dpCurrentDate.setMonth(dpCurrentDate.getMonth() - 1);
     renderDpCalendar();
   });
 
   $(".dp-next").click(function(e) {
     e.stopPropagation();
+    dpCurrentDate.setDate(1);
     dpCurrentDate.setMonth(dpCurrentDate.getMonth() + 1);
     renderDpCalendar();
   });
@@ -378,10 +418,13 @@ $(document).ready(function () {
   populateMinutes();
 
   function scrollToValue($wheel, value) {
-    let $item = $wheel.find(`.tp-wheel-item[data-val="${value}"]`);
+    let $items = $wheel.find(".tp-wheel-item");
+    let $item = $items.filter(`[data-val="${value}"]`);
     if ($item.length) {
-      let scrollPos = $item.index() * 40; 
+      // ใช้ลำดับในกลุ่ม item เท่านั้น (ไม่นับ spacer) ไม่งั้นเลื่อนเลยไป 1 ช่อง
+      let scrollPos = $items.index($item) * 40;
       $wheel.scrollTop(scrollPos);
+      $item.addClass("tp-active").siblings(".tp-wheel-item").removeClass("tp-active");
     }
   }
 
@@ -437,10 +480,6 @@ $(document).ready(function () {
     $("#timePickerModal").css("display", "flex");
   });
 
-  $(".tp-overlay").click(function() {
-    $("#timePickerModal").hide();
-  });
-
   $(".tp-wheel").scroll(function() {
     let scrollTop = $(this).scrollTop();
     let index = Math.round(scrollTop / 40);
@@ -460,7 +499,8 @@ $(document).ready(function () {
     }
   });
 
-  $(".tp-overlay").click(function() {
+  // กด Done หรือแตะพื้นหลัง = บันทึกเวลา
+  $(".tp-overlay, #tpDoneBtn").click(function() {
     let h = $("#tpHourDisplay").text();
     let m = $("#tpMinDisplay").text();
     let ampm = $("#tpAmPmDisplay").text();
@@ -578,11 +618,11 @@ function createAgendaItemHtml(app, isOngoing) {
       <div>
         <span class="agenda-title">
           <span class="agenda-color-dot dot-${color}"></span>
-          ${app.title}
+          ${escapeHtml(app.title)}
         </span>
         <span class="agenda-meta">${dateDisplay} · ${timeDisplay}</span>
       </div>
-      <button class="btn-del" data-id="${app.id}" type="button">Remove</button>
+      <button class="btn-del" data-id="${escapeHtml(app.id)}" type="button">Remove</button>
     </li>
   `;
 }
@@ -601,11 +641,17 @@ function renderQuickStickers() {
   quickStickers.forEach(sticker => {
     let colorClass = "sticker-" + (sticker.color || "purple");
     let $chip = $(`
-      <div class="draggable-chip ${colorClass}" data-title="${sticker.title}" data-duration="${sticker.duration}" data-details="${sticker.details || ''}" data-color="${sticker.color || 'purple'}">
-        ${sticker.title} (${sticker.duration}h)
-        <button class="btn-del-sticker" data-id="${sticker.id}" type="button" title="Remove sticker">×</button>
+      <div class="draggable-chip ${colorClass}">
+        ${escapeHtml(sticker.title)} (${sticker.duration}h)
+        <button class="btn-del-sticker" type="button" title="Remove sticker">×</button>
       </div>
     `);
+    // ใส่ผ่าน .attr/.data เพื่อไม่ให้ " ในข้อความทำ attribute พัง
+    $chip.attr("data-title", sticker.title)
+         .attr("data-duration", sticker.duration)
+         .attr("data-details", sticker.details || "")
+         .attr("data-color", sticker.color || "purple");
+    $chip.find(".btn-del-sticker").attr("data-id", sticker.id);
     $container.append($chip);
   });
 }
@@ -621,106 +667,126 @@ function renderCalendar() {
 
   let firstDay = new Date(year, month, 1).getDay();
   let daysInMonth = new Date(year, month + 1, 0).getDate();
+  let totalRows = Math.ceil((firstDay + daysInMonth) / 7);
+  let monthStartStr = `${year}-${pad2(month + 1)}-01`;
+  let monthEndStr = `${year}-${pad2(month + 1)}-${pad2(daysInMonth)}`;
+  let monthStartMs = new Date(monthStartStr + "T00:00:00").getTime();
 
-  let $container = $("#daysContainer");
-  $container.empty();
-
-  // 1. วาดช่องวันว่างก่อนวันแรก
-  for (let i = 0; i < firstDay; i++) {
-    $container.append('<div class="cell empty"></div>');
+  // วันที่ → index ใน grid (0 = ช่องแรกของสัปดาห์แรก) อาจติดลบหรือเกินเดือนได้
+  function gridIndex(dateStr) {
+    return Math.round((new Date(dateStr + "T00:00:00").getTime() - monthStartMs) / 86400000) + firstDay;
   }
 
-  // 2. วาดช่องวันปกติ
-  let today = new Date();
-  for (let day = 1; day <= daysInMonth; day++) {
-    let monthStr = String(month + 1).padStart(2, "0");
-    let dayStr = String(day).padStart(2, "0");
-    let dateFormatted = `${year}-${monthStr}-${dayStr}`;
-
-    let isToday = (today.getFullYear() === year && today.getMonth() === month && today.getDate() === day);
-    let cellClass = isToday ? "cell is-today" : "cell";
-
-    let $cell = $(
-      `<div class="${cellClass}" data-date="${dateFormatted}">
-         <span class="cell-num">${day}</span>
-       </div>`
-    );
-    $container.append($cell);
-  }
-
-  // 3. วาดช่องวันว่างหลังวันสุดท้าย (เพื่อให้ Grid ครบสัปดาห์)
-  let totalCells = firstDay + daysInMonth;
-  let remainingCells = (7 - (totalCells % 7)) % 7;
-  for (let i = 0; i < remainingCells; i++) {
-    $container.append('<div class="cell empty"></div>');
-  }
-
-  // 4. วาดแท่ง Events แบบ Absolute Position (คำนวณจาก Grid)
-  setTimeout(() => {
-    // หาตำแหน่ง X ของแต่ละวันใน Grid
-    let cellWidth = $(".cell:not(.empty)").first().outerWidth();
-    let cellHeight = $(".cell:not(.empty)").first().outerHeight();
-    
-    // ลบแท่งเดิมออกก่อน
-    $(".month-event-bar").remove();
-
-    let eventsByRow = {}; // จัดกลุ่ม Events ตามสัปดาห์ (Row)
-
-    appointments.forEach(evt => {
-      let start = new Date(evt.date + "T00:00:00");
-      let end = new Date((evt.endDate || evt.date) + "T00:00:00");
-
-      let monthStart = new Date(year, month, 1);
-      let monthEnd = new Date(year, month + 1, 0);
-
-      let displayStart = start < monthStart ? monthStart : start;
-      let displayEnd = end > monthEnd ? monthEnd : end;
-
-      if (displayStart > displayEnd) return; 
-
-      // หาตำแหน่ง Row (สัปดาห์) ของวันเริ่มและวันจบ (อิงจากวันที่ 1 ของเดือน)
-      let startRow = Math.floor((displayStart.getDate() + firstDay - 1) / 7);
-      let endRow = Math.floor((displayEnd.getDate() + firstDay - 1) / 7);
-
-      for (let row = startRow; row <= endRow; row++) {
-        let rowStartCol = (row === startRow) ? displayStart.getDay() : 0;
-        let rowEndCol = (row === endRow) ? displayEnd.getDay() : 6;
-
-        // คำนวณ Width และ Left (อ้างอิงจาก Grid 7 คอลัมน์)
-        let leftPx = rowStartCol * cellWidth;
-        let widthPx = (rowEndCol - rowStartCol + 1) * cellWidth;
-
-        // เผื่อระยะ Padding ซ้าย-ขวา
-        let paddingPx = 6;
-        leftPx += paddingPx;
-        widthPx -= (paddingPx * 2);
-
-        // คำนวณ Top (เว้นที่ให้ตัวเลขวันที่)
-        let topPx = (row * cellHeight) + 32; 
-
-        if (!eventsByRow[row]) eventsByRow[row] = [];
-        let stackIndex = eventsByRow[row].length;
-        
-        // ถ้ามีหลาย Event ในสัปดาห์เดียวกัน ให้ซ้อนลงมา
-        topPx += (stackIndex * 12); 
-
-        // สร้างแท่งสี
-        let colorClass = "bar-" + (evt.color || "purple");
-        let $bar = $(`<div class="month-event-bar ${colorClass}" style="left: ${leftPx}px; top: ${topPx}px; width: ${widthPx}px;"></div>`);
-        
-        // เพิ่มความโค้งที่หัวและท้าย
-        if (row === startRow && rowStartCol === displayStart.getDay()) {
-           $bar.css("border-top-left-radius", "4px").css("border-bottom-left-radius", "4px");
-        }
-        if (row === endRow && rowEndCol === displayEnd.getDay()) {
-           $bar.css("border-top-right-radius", "4px").css("border-bottom-right-radius", "4px");
-        }
-
-        $(".days-grid").append($bar);
-        eventsByRow[row].push(evt);
-      }
+  // 1. รวม event ที่ "ติดกัน" (ชื่อ+สีเดียวกัน และอยู่วันต่อเนื่องกัน) ให้เป็นเส้นเดียว
+  let items = [];
+  appointments.forEach(evt => {
+    let s = evt.date;
+    let e = evt.endDate || evt.date;
+    if (e < monthStartStr || s > monthEndStr) return;
+    items.push({
+      s, e,
+      color: evt.color || "purple",
+      title: evt.title || "",
+      key: (evt.color || "purple") + "|" + (evt.title || "").trim().toLowerCase()
     });
-  }, 50);
+  });
+  items.sort((a, b) => a.key.localeCompare(b.key) || a.s.localeCompare(b.s));
+
+  let ranges = [];
+  items.forEach(it => {
+    let last = ranges[ranges.length - 1];
+    if (last && last.key === it.key && it.s <= addDaysStr(last.e, 1)) {
+      if (it.e > last.e) last.e = it.e;
+    } else {
+      ranges.push({ s: it.s, e: it.e, color: it.color, title: it.title, key: it.key });
+    }
+  });
+
+  // 2. ตัดเส้นเป็นท่อนตามสัปดาห์ (แถว)
+  let segsByRow = [];
+  for (let r = 0; r < totalRows; r++) segsByRow.push([]);
+  let gridFirst = firstDay;
+  let gridLast = firstDay + daysInMonth - 1;
+
+  ranges.forEach(rg => {
+    let realS = gridIndex(rg.s);
+    let realE = gridIndex(rg.e);
+    let s = Math.max(realS, gridFirst);
+    let e = Math.min(realE, gridLast);
+    if (s > e) return;
+
+    for (let r = Math.floor(s / 7); r <= Math.floor(e / 7); r++) {
+      let segS = Math.max(s, r * 7);
+      let segE = Math.min(e, r * 7 + 6);
+      segsByRow[r].push({
+        colStart: segS % 7,
+        colEnd: segE % 7,
+        // ต่อเนื่องมาจาก/ไปยังสัปดาห์อื่น → ชนขอบช่องเพื่อให้เส้นเชื่อมกัน
+        contLeft: realS < r * 7,
+        contRight: realE > r * 7 + 6,
+        color: rg.color,
+        title: rg.title
+      });
+    }
+  });
+
+  // 3. วาดแถวสัปดาห์
+  let $container = $("#daysContainer").empty();
+  let today = new Date();
+  const LANE_H = 12;
+  const TOP_BASE = 32;
+  const INSET = 3;
+
+  for (let r = 0; r < totalRows; r++) {
+    let $row = $('<div class="week-row"></div>');
+
+    for (let c = 0; c < 7; c++) {
+      let day = r * 7 + c - firstDay + 1;
+      if (day < 1 || day > daysInMonth) {
+        $row.append('<div class="cell empty"></div>');
+        continue;
+      }
+      let dateFormatted = `${year}-${pad2(month + 1)}-${pad2(day)}`;
+      let isToday = (today.getFullYear() === year && today.getMonth() === month && today.getDate() === day);
+      $row.append(
+        `<div class="${isToday ? "cell is-today" : "cell"}" data-date="${dateFormatted}">
+           <span class="cell-num">${day}</span>
+         </div>`
+      );
+    }
+
+    // จัดเลน: event ที่ไม่ซ้อนกันใช้เลนเดียวกัน → เส้นของวันที่ติดกันจะอยู่ระดับเดียวกัน
+    let segs = segsByRow[r].sort((a, b) => a.colStart - b.colStart || (b.colEnd - b.colStart) - (a.colEnd - a.colStart));
+    let laneEnds = [];
+    segs.forEach(seg => {
+      let lane = laneEnds.findIndex(endCol => endCol < seg.colStart);
+      if (lane === -1) { lane = laneEnds.length; laneEnds.push(-1); }
+      laneEnds[lane] = seg.colEnd;
+      seg.lane = lane;
+    });
+
+    $row.css("min-height", Math.max(120, TOP_BASE + laneEnds.length * LANE_H + 10) + "px");
+
+    segs.forEach(seg => {
+      let span = seg.colEnd - seg.colStart + 1;
+      let insetL = seg.contLeft ? 0 : INSET;
+      let insetR = seg.contRight ? 0 : INSET;
+
+      let $bar = $('<div class="month-event-bar"></div>')
+        .addClass("bar-" + seg.color)
+        .toggleClass("cont-left", seg.contLeft)
+        .toggleClass("cont-right", seg.contRight)
+        .attr("title", seg.title)
+        .css({
+          left: `calc(${seg.colStart} * 100% / 7 + ${insetL}px)`,
+          width: `calc(${span} * 100% / 7 - ${insetL + insetR}px)`,
+          top: (TOP_BASE + seg.lane * LANE_H) + "px"
+        });
+      $row.append($bar);
+    });
+
+    $container.append($row);
+  }
 }
 
 // ============================================================
@@ -739,65 +805,73 @@ function showDayDetail(dateStr) {
     let end = app.endDate || app.date;
     return dateStr >= start && dateStr <= end;
   });
-  
-  dayEvents.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+
+  // ช่วงเวลาของ event ในวันนี้: วันแรกเริ่มตามเวลาเริ่ม, วันสุดท้ายจบตามเวลาจบ, วันกลางเต็มวัน
+  let items = dayEvents.map(evt => {
+    let end = evt.endDate || evt.date;
+    let s = (dateStr === evt.date) ? timeToMinutes(evt.time) : 0;
+    let e = (dateStr === end) ? timeToMinutes(evt.endTime) : 1440;
+    if (e <= s) e = Math.min(1440, s + 30);
+    return { evt, start: s, end: e };
+  });
+  items.sort((a, b) => a.start - b.start || b.end - a.end);
 
   $("#timelineGrid .event-sticker-block").remove();
   let $banner = $("#allDayBanner").empty();
 
-  if (dayEvents.length > 0) {
+  firstEventMinutes = null;
+
+  if (items.length > 0) {
+    firstEventMinutes = items[0].start;
+
+    // จัดกลุ่มที่ซ้อนทับกัน (เทียบกับเวลาจบ "สูงสุด" ของกลุ่ม) แล้วแบ่งคอลัมน์
     let groups = [];
-    let currentGroup = [];
-
-    dayEvents.forEach(evt => {
-      let evtStart = timeToMinutes(evt.time);
-      let evtEnd = timeToMinutes(evt.endTime);
-
-      if (currentGroup.length === 0) {
-        currentGroup.push({ evt, start: evtStart, end: evtEnd });
-      } else {
-        let lastInGroup = currentGroup[currentGroup.length - 1];
-        if (evtStart < lastInGroup.end) {
-          currentGroup.push({ evt, start: evtStart, end: evtEnd });
-        } else {
-          groups.push([...currentGroup]);
-          currentGroup = [{ evt, start: evtStart, end: evtEnd }];
-        }
+    let current = null;
+    items.forEach(item => {
+      if (!current || item.start >= current.maxEnd) {
+        current = { items: [], maxEnd: 0, colEnds: [] };
+        groups.push(current);
       }
+      let col = current.colEnds.findIndex(endMin => endMin <= item.start);
+      if (col === -1) { col = current.colEnds.length; current.colEnds.push(0); }
+      current.colEnds[col] = item.end;
+      item.col = col;
+      current.items.push(item);
+      current.maxEnd = Math.max(current.maxEnd, item.end);
     });
-    if (currentGroup.length > 0) groups.push(currentGroup);
 
     groups.forEach(group => {
-      let groupSize = group.length;
-      
-      group.forEach((item, index) => {
+      let cols = group.colEnds.length;
+
+      group.items.forEach(item => {
         let evt = item.evt;
         let color = evt.color || "purple";
-        
+        let safeTitle = escapeHtml(evt.title);
+        let timeText = `${evt.time} - ${evt.endTime}`;
+        if ((evt.endDate || evt.date) !== evt.date) {
+          timeText = `${evt.date} ${evt.time} → ${evt.endDate} ${evt.endTime}`;
+        }
+
         $banner.append(
           `<div class="event-banner-item banner-${color}">
-             ${evt.title} (${evt.time} - ${evt.endTime})
-             <button class="btn-del-banner" data-id="${evt.id}" type="button" title="Remove event">×</button>
+             ${safeTitle} (${escapeHtml(timeText)})
+             <button class="btn-del-banner" data-id="${escapeHtml(evt.id)}" type="button" title="Remove event">×</button>
            </div>`
         );
 
-        let minutesFromTop = item.start;
-        let durationMinutes = item.end - item.start;
+        let topPx = item.start * PX_PER_MINUTE;
+        let heightPx = Math.max((item.end - item.start) * PX_PER_MINUTE, 18);
 
-        let topPx = minutesFromTop * PX_PER_MINUTE;
-        let heightPx = durationMinutes * PX_PER_MINUTE;
+        let widthPercent = 100 / cols;
+        let leftPercent = widthPercent * item.col;
 
-        let widthPercent = 100 / groupSize;
-        let leftPercent = widthPercent * index;
-
-        // ดันไปทางขวา 74px และลบความกว้าง 80px
         let $sticker = $(`
-          <div class="event-sticker-block sticker-${color}" 
+          <div class="event-sticker-block sticker-${color}"
                style="top: ${topPx}px; height: ${heightPx - 2}px; width: calc(${widthPercent}% - 78px); left: calc(${leftPercent}% + 74px);">
-            <div class="sticker-title">${evt.title}</div>
-            <div class="sticker-time">${evt.time} - ${evt.endTime}</div>
-            ${evt.details ? `<div class="sticker-details">${evt.details}</div>` : ""}
-            <button class="btn-del-timeline" data-id="${evt.id}" type="button" title="Remove event">×</button>
+            <div class="sticker-title">${safeTitle}</div>
+            <div class="sticker-time">${escapeHtml(timeText)}</div>
+            ${evt.details ? `<div class="sticker-details">${escapeHtml(evt.details)}</div>` : ""}
+            <button class="btn-del-timeline" data-id="${escapeHtml(evt.id)}" type="button" title="Remove event">×</button>
           </div>
         `);
 
@@ -809,6 +883,15 @@ function showDayDetail(dateStr) {
       '<div style="color: var(--text-muted); font-size: 0.85rem;">No events for this day.</div>'
     );
   }
+
+  scrollTimelineToFocus();
+}
+
+// เลื่อน timeline ไปที่ event แรกของวัน (ถ้าไม่มีให้ไปที่ 07:00)
+function scrollTimelineToFocus() {
+  if (!$("#dayDetailView").is(":visible")) return;
+  let mins = (firstEventMinutes != null) ? firstEventMinutes : 7 * 60;
+  $(".timeline-scroll").scrollTop(Math.max(0, mins * PX_PER_MINUTE - 20));
 }
 
 // ============================================================
@@ -875,26 +958,30 @@ function initDraggablesAndDroppables() {
           }
           if (!selectedDateStr) return;
 
-          let targetTimeStr = $(this).data("time-slot");
-          let title = ui.draggable.data("title");
-          let duration = parseFloat(ui.draggable.data("duration")) || 1;
-          let details = ui.draggable.data("details") || "";
-          let color = ui.draggable.data("color") || "purple";
+          let targetTimeStr = String($(this).data("time-slot"));
+          let title = String(ui.draggable.attr("data-title"));
+          let duration = parseFloat(ui.draggable.attr("data-duration")) || 1;
+          let details = ui.draggable.attr("data-details") || "";
+          let color = ui.draggable.attr("data-color") || "purple";
 
           let [h, m] = targetTimeStr.split(":");
           let formattedTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 
           let startMinutes = parseInt(h) * 60 + parseInt(m);
-          let endMinutes = startMinutes + (duration * 60);
-          
-          let endH = Math.floor(endMinutes / 60) % 24;
-          let endM = endMinutes % 60;
-          let formattedEndTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
+          let endMinutes = Math.round(startMinutes + duration * 60);
+
+          // ถ้าเกินเที่ยงคืน ให้ไปจบวันถัดไป (เดิมใช้ % 24 ทำให้เวลาจบน้อยกว่าเวลาเริ่ม)
+          let endDateStr = selectedDateStr;
+          if (endMinutes >= 1440) {
+            endDateStr = addDaysStr(selectedDateStr, Math.floor(endMinutes / 1440));
+            endMinutes = endMinutes % 1440;
+          }
+          let formattedEndTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
 
           let newEventData = {
             userId: currentUserId,
             date: selectedDateStr,
-            endDate: selectedDateStr,
+            endDate: endDateStr,
             time: formattedTime,
             endTime: formattedEndTime,
             duration: duration,
@@ -961,6 +1048,9 @@ function parseJwt(token) {
 }
 
 $(document).on("click", "#logoutBtn", function () {
+  if (window.google && google.accounts && google.accounts.id) {
+    google.accounts.id.disableAutoSelect();
+  }
   $("#userInfo").hide();
   $("#loginContainer").show();
 
