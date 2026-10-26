@@ -53,7 +53,7 @@
         <form id="appointmentForm" class="entry-form">
           <div class="field">
             <label for="eventDate">Active Date</label>
-            <input type="date" id="eventDate" required placeholder="Select a day first">
+            <input type="date" id="eventDate" required>
           </div>
 
           <div class="field-row">
@@ -77,15 +77,31 @@
             <input type="text" id="eventDetails" placeholder="Room, link, or extra info" autocomplete="off">
           </div>
 
+          <!-- ✅ วงกลมสีที่เล็กลง -->
           <div class="field">
-            <label for="eventColor">Color Tag</label>
-            <select id="eventColor" class="color-select">
-              <option value="purple">Purple (Default)</option>
-              <option value="blue">Blue</option>
-              <option value="green">Green</option>
-              <option value="orange">Orange</option>
-              <option value="red">Red</option>
-            </select>
+            <label>Color Tag</label>
+            <div class="color-picker">
+              <label class="color-option">
+                <input type="radio" name="eventColor" value="purple" checked>
+                <span class="color-swatch color-purple" title="Purple"></span>
+              </label>
+              <label class="color-option">
+                <input type="radio" name="eventColor" value="blue">
+                <span class="color-swatch color-blue" title="Blue"></span>
+              </label>
+              <label class="color-option">
+                <input type="radio" name="eventColor" value="green">
+                <span class="color-swatch color-green" title="Green"></span>
+              </label>
+              <label class="color-option">
+                <input type="radio" name="eventColor" value="orange">
+                <span class="color-swatch color-orange" title="Orange"></span>
+              </label>
+              <label class="color-option">
+                <input type="radio" name="eventColor" value="red">
+                <span class="color-swatch color-red" title="Red"></span>
+              </label>
+            </div>
           </div>
 
           <button type="submit" id="addBtn" class="btn-primary">Add Event</button>
@@ -104,7 +120,6 @@
           <input type="text" id="stickerTitle" placeholder="Sticker title" required>
           <input type="text" id="stickerDetails" placeholder="Notes (optional)">
           
-          <!-- ✅ เปลี่ยนเป็น Dropdown เลือก ชั่วโมง และ นาที -->
           <div class="field-row" style="margin-bottom: 4px;">
             <div class="field" style="flex: 1; margin-bottom: 0;">
               <label style="font-size: 0.65rem; margin-bottom: 2px;">Hours</label>
@@ -127,16 +142,33 @@
             </div>
           </div>
 
-          <div class="field-row">
-            <select id="stickerColor" class="color-select-small" style="flex: 1;">
-              <option value="purple">Purple</option>
-              <option value="blue">Blue</option>
-              <option value="green">Green</option>
-              <option value="orange">Orange</option>
-              <option value="red">Red</option>
-            </select>
-            <button type="submit" class="btn-small" style="flex: 1;">Create</button>
+          <!-- ✅ Quick Sticker วงกลมสีเล็ก -->
+          <div class="field" style="margin-bottom: 6px;">
+            <div class="color-picker" style="justify-content: space-between; padding: 0 4px;">
+              <label class="color-option">
+                <input type="radio" name="stickerColor" value="purple" checked>
+                <span class="color-swatch color-purple"></span>
+              </label>
+              <label class="color-option">
+                <input type="radio" name="stickerColor" value="blue">
+                <span class="color-swatch color-blue"></span>
+              </label>
+              <label class="color-option">
+                <input type="radio" name="stickerColor" value="green">
+                <span class="color-swatch color-green"></span>
+              </label>
+              <label class="color-option">
+                <input type="radio" name="stickerColor" value="orange">
+                <span class="color-swatch color-orange"></span>
+              </label>
+              <label class="color-option">
+                <input type="radio" name="stickerColor" value="red">
+                <span class="color-swatch color-red"></span>
+              </label>
+            </div>
           </div>
+
+          <button type="submit" class="btn-small" style="width: 100%;">Create Sticker</button>
         </form>
 
         <div class="preset-chips" id="presetChipsContainer"></div>
