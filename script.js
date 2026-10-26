@@ -258,12 +258,10 @@ $(document).ready(function () {
       });
   });
 
-  // ---- Delete Event (from Timeline or Banner) ----
+  // ✅ ---- Delete Event (from Timeline or Banner) - ลบเลยไม่ต้องถาม ----
   $(document).on("click", ".btn-del-banner, .btn-del-timeline", function (e) {
     e.stopPropagation();
     let idToDelete = $(this).data("id").toString();
-
-    if (!confirm("Remove this event?")) return;
 
     db.collection("events").doc(idToDelete).delete()
       .then(() => {
@@ -462,7 +460,6 @@ $(document).ready(function () {
     }
   });
 
-  // กดปุ่ม OK (หรือคลิกพื้นหลังเพื่อบันทึก)
   $(".tp-overlay").click(function() {
     let h = $("#tpHourDisplay").text();
     let m = $("#tpMinDisplay").text();
@@ -614,7 +611,7 @@ function renderQuickStickers() {
 }
 
 // ============================================================
-//  RENDER MONTH CALENDAR (Multi-day bar)
+//  ✅ RENDER MONTH CALENDAR (Stacked & Connected Bars)
 // ============================================================
 function renderCalendar() {
   let year = currentDate.getFullYear();
@@ -652,10 +649,10 @@ function renderCalendar() {
       return dateFormatted >= start && dateFormatted <= end;
     });
 
-    let dashesHtml = "";
+    let barsHtml = "";
     if (dayEvents.length > 0) {
-      dashesHtml = '<div class="event-dots">';
-      dayEvents.slice(0, 3).forEach(evt => {
+      barsHtml = '<div class="event-stack">';
+      dayEvents.forEach(evt => {
         let c = evt.color || "purple";
         let start = evt.date;
         let end = evt.endDate || evt.date;
@@ -669,18 +666,15 @@ function renderCalendar() {
            classCap = "end-cap";
         }
 
-        dashesHtml += `<div class="event-dash-container"><div class="event-dash dash-${c} ${classCap}"></div></div>`;
+        barsHtml += `<div class="event-bar bar-${c} ${classCap}"></div>`;
       });
-      if (dayEvents.length > 3) {
-        dashesHtml += `<span class="event-dash-more">+${dayEvents.length - 3}</span>`;
-      }
-      dashesHtml += '</div>';
+      barsHtml += '</div>';
     }
 
     let $cell = $(
       `<div class="${cellClass}" data-date="${dateFormatted}">
          <span class="cell-num">${day}</span>
-         ${dashesHtml}
+         ${barsHtml}
        </div>`
     );
     $container.append($cell);
@@ -688,7 +682,7 @@ function renderCalendar() {
 }
 
 // ============================================================
-//  DAY DETAIL VIEW
+//  ✅ DAY DETAIL VIEW (แก้บัคซ้อนทับ & ระยะห่าง)
 // ============================================================
 function showDayDetail(dateStr) {
   let dateObj = new Date(dateStr + "T00:00:00");
@@ -754,9 +748,10 @@ function showDayDetail(dateStr) {
         let widthPercent = 100 / groupSize;
         let leftPercent = widthPercent * index;
 
+        // ดันไปทางขวา 74px (70px Label + 4px padding) และลบความกว้าง 80px 
         let $sticker = $(`
           <div class="event-sticker-block sticker-${color}" 
-               style="top: ${topPx}px; height: ${heightPx - 2}px; width: calc(${widthPercent}% - 80px); left: calc(${leftPercent}% + 74px);">
+               style="top: ${topPx}px; height: ${heightPx - 2}px; width: calc(${widthPercent}% - 78px); left: calc(${leftPercent}% + 74px);">
             <div class="sticker-title">${evt.title}</div>
             <div class="sticker-time">${evt.time} - ${evt.endTime}</div>
             ${evt.details ? `<div class="sticker-details">${evt.details}</div>` : ""}
