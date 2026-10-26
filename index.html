@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedule · Academic & Personal</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+  
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+</head>
+<body>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-title">Schedule</span>
+        <span class="brand-sub">Academic & Personal</span>
+      </div>
+
+      <!-- Google Login -->
+      <section class="auth-section">
+        <div id="g_id_onload"
+             data-client_id="939767735796-7rbfgjv0bc1fpqk0dlck9rj2u192ppge.apps.googleusercontent.com"
+             data-callback="handleCredentialResponse"
+             data-auto_prompt="false">
+        </div>
+        <div id="loginContainer" class="login-container">
+          <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="medium" data-logo_alignment="left"></div>
+        </div>
+        <div id="userInfo" class="user-info" style="display: none;">
+          <img id="userAvatar" src="" alt="User Avatar" class="user-avatar">
+          <div class="user-details">
+            <span id="userName" class="user-name"></span>
+            <button id="logoutBtn" type="button" class="btn-logout">Sign Out</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Main Event Form -->
+      <section class="form-section">
+        <form id="appointmentForm" class="entry-form">
+          <div class="field">
+            <label for="eventDate">Active Date</label>
+            <input type="date" id="eventDate" required placeholder="Select a day first">
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="eventStartTime">Start Time</label>
+              <input type="time" id="eventStartTime" value="09:00" step="1800" required>
+            </div>
+            <div class="field">
+              <label for="eventEndTime">End Time</label>
+              <input type="time" id="eventEndTime" value="10:00" step="1800" required>
+            </div>
+          </div>
+          
+          <div class="field">
+            <label for="eventTitle">Title</label>
+            <input type="text" id="eventTitle" placeholder="Lecture, exam, task" autocomplete="off" required>
+          </div>
+          
+          <div class="field">
+            <label for="eventDetails">Notes</label>
+            <input type="text" id="eventDetails" placeholder="Room, link, or extra info" autocomplete="off">
+          </div>
+
+          <button type="submit" id="addBtn" class="btn-primary">Add Event</button>
+        </form>
+      </section>
+
+      <!-- Quick Stickers Section -->
+      <section id="dragPresetsSection" class="drag-presets-section" style="display: none;">
+        <div class="section-label-row">
+          <span class="section-label">Quick stickers</span>
+          <button id="toggleStickerFormBtn" class="btn-icon" type="button" title="Create sticker">+</button>
+        </div>
+
+        <!-- Mini Form for creating stickers -->
+        <form id="stickerForm" class="sticker-form" style="display: none;">
+          <input type="text" id="stickerTitle" placeholder="Sticker title" required>
+          <input type="text" id="stickerDetails" placeholder="Notes (optional)">
+          <div class="field-row">
+            <input type="number" id="stickerDuration" placeholder="Duration (h)" min="0.5" max="12" step="0.5" value="1" required>
+            <button type="submit" class="btn-small">Create</button>
+          </div>
+        </form>
+
+        <div class="preset-chips" id="presetChipsContainer"></div>
+      </section>
+
+      <!-- Agenda -->
+      <section class="agenda-section">
+        <div class="section-head">
+          <span>Upcoming Agenda</span>
+          <span id="eventCount" class="count-tag">0</span>
+        </div>
+        <ul id="eventList" class="agenda-list"></ul>
+      </section>
+    </aside>
+
+    <!-- Main Calendar -->
+    <main class="calendar-view">
+      <!-- Month View -->
+      <div id="monthView" class="view-panel active">
+        <header class="calendar-toolbar">
+          <h1 id="monthYearDisplay" class="month-title">—</h1>
+          <div class="nav-group">
+            <button id="prevBtn" class="btn-nav" type="button">Previous</button>
+            <button id="nextBtn" class="btn-nav" type="button">Next</button>
+          </div>
+        </header>
+
+        <div class="calendar-board">
+          <div class="weekdays-row">
+            <div>Sun</div><div>Mon</div><div>Tue</div>
+            <div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+          </div>
+          <div id="daysContainer" class="days-grid"></div>
+        </div>
+      </div>
+
+      <!-- Day View -->
+      <div id="dayDetailView" class="view-panel" style="display: none;">
+        <header class="day-toolbar">
+          <button id="backToMonthBtn" class="btn-nav" type="button">← Back to Month</button>
+          <div class="day-badge-header">
+            <span id="detailDayName" class="day-name-label">Day</span>
+            <div id="detailDayCircle" class="day-circle-badge">0</div>
+          </div>
+        </header>
+
+        <div id="allDayBanner" class="all-day-banner"></div>
+
+        <div class="timeline-scroll">
+          <div id="timelineGrid" class="timeline-grid"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
