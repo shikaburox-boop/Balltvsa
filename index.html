@@ -216,7 +216,9 @@
     <div class="tp-overlay"></div>
     <div class="tp-content">
       <div class="tp-display">
-        <span id="tpHourDisplay">04</span><span class="tp-colon">:</span><span id="tpMinDisplay">00</span><span id="tpAmPmDisplay" class="tp-ampm">AM</span>
+        <input type="text" id="tpHourInput" class="tp-time-input" inputmode="numeric" maxlength="2" value="09" autocomplete="off" aria-label="Hour (00-23)">
+        <span class="tp-colon">:</span>
+        <input type="text" id="tpMinInput" class="tp-time-input" inputmode="numeric" maxlength="2" value="00" autocomplete="off" aria-label="Minute (00-59)">
       </div>
       <div class="tp-wheel-container">
         <div class="tp-highlight-bar"></div>
@@ -233,12 +235,6 @@
           <div class="tp-wheel-spacer"></div>
         </div>
 
-        <div class="tp-wheel" id="wheelAmPm">
-          <div class="tp-wheel-spacer"></div>
-          <div class="tp-wheel-item" data-val="AM">AM</div>
-          <div class="tp-wheel-item" data-val="PM">PM</div>
-          <div class="tp-wheel-spacer"></div>
-        </div>
       </div>
       <button type="button" id="tpDoneBtn" class="tp-done">Done</button>
     </div>
