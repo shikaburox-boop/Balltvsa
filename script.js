@@ -1,8 +1,7 @@
 // ============================================================
-//  Schedule & Event Manager - script.js (Database Connected)
+//  Schedule & Event Manager - script.js
 // ============================================================
 
-// TODO: แทนที่ค่า Config นี้ด้วยโปรเจกต์ Firebase ของคุณจริง ๆ
 const firebaseConfig = {
   apiKey: "AIzaSyBKGhZyNWA6wEIbjowrhdToXdSpQpL3O5Y",
   authDomain: "awesome-calendar-4a106.firebaseapp.com",
@@ -12,7 +11,6 @@ const firebaseConfig = {
   appId: "1:939767735796:web:f6de740a3305f60f2e05a1"
 };
 
-// เริ่มต้นใช้งาน Firebase (ต้องมั่นใจว่าใส่ Script Firebase ใน HTML แล้ว)
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
@@ -22,7 +20,7 @@ let appointments = [];
 let quickStickers = [];
 let currentDate = new Date();
 let selectedDateStr = "";
-let currentUserId = null; // เก็บ UID ของผู้ใช้ที่ล็อกอิน
+let currentUserId = null;
 
 const monthNames = [
   "January", "February", "March", "April", "May", "June",
@@ -30,6 +28,15 @@ const monthNames = [
 ];
 
 const dayNamesTh = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
+
+const SLOT_HEIGHT_PX = 70;
+const PX_PER_MINUTE = SLOT_HEIGHT_PX / 60;
+
+function timeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  let [h, m] = timeStr.split(":").map(Number);
+  return h * 60 + m;
+}
 
 // ============================================================
 //  INIT
@@ -63,7 +70,7 @@ $(document).ready(function () {
     $("#stickerForm").hide();
   });
 
-  // ---- Main Form: Add Event (บันทึกลง Database Collection: events) ----
+  // ---- Main Form: Add Event ----
   $("#appointmentForm").submit(function (e) {
     e.preventDefault();
 
@@ -82,13 +89,12 @@ $(document).ready(function () {
     let endTimeVal = $("#eventEndTime").val() || "10:00";
     let titleVal = $("#eventTitle").val().trim();
     let detailsVal = $("#eventDetails").val().trim();
+    let colorVal = $("#eventColor").val() || "purple";
 
     if (!titleVal) return;
 
-    let [startH, startM] = startTimeVal.split(":").map(Number);
-    let [endH, endM] = endTimeVal.split(":").map(Number);
-    let startMinutes = startH * 60 + startM;
-    let endMinutes = endH * 60 + endM;
+    let startMinutes = timeToMinutes(startTimeVal);
+    let endMinutes = timeToMinutes(endTimeVal);
     let durationVal = (endMinutes - startMinutes) / 60;
 
     if (durationVal <= 0) {
@@ -104,10 +110,10 @@ $(document).ready(function () {
       duration: durationVal,
       title: titleVal,
       details: detailsVal,
+      color: colorVal,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    // บันทึกลงตาราง/Collection 'events' ใน Database
     db.collection("events").add(newEventData)
       .then((docRef) => {
         newEventData.id = docRef.id;
@@ -134,7 +140,7 @@ $(document).ready(function () {
     $("#stickerTitle").focus();
   });
 
-  // ---- Mini Form: Create Quick Sticker (บันทึกลง Database Collection: stickers) ----
+  // ---- Mini Form: Create Quick Sticker (ใช้ Dropdown ชั่วโมง/นาที) ----
   $("#stickerForm").submit(function (e) {
     e.preventDefault();
 
@@ -145,19 +151,28 @@ $(document).ready(function () {
 
     let title = $("#stickerTitle").val().trim();
     let details = $("#stickerDetails").val().trim();
-    let duration = parseFloat($("#stickerDuration").val()) || 1;
+    
+    let hours = parseInt($("#stickerHours").val()) || 0;
+    let minutes = parseInt($("#stickerMinutes").val()) || 0;
+    let duration = hours + (minutes / 60);
+
+    let color = $("#stickerColor").val() || "purple";
 
     if (!title) return;
+    if (duration <= 0) {
+      alert("Duration must be greater than 0.");
+      return;
+    }
 
     let newStickerData = {
       userId: currentUserId,
       title: title,
       duration: duration,
       details: details,
+      color: color,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    // บันทึกลงตาราง/Collection 'stickers' ใน Database แยกต่างหาก
     db.collection("stickers").add(newStickerData)
       .then((docRef) => {
         newStickerData.id = docRef.id;
@@ -166,7 +181,8 @@ $(document).ready(function () {
 
         $("#stickerTitle").val("");
         $("#stickerDetails").val("");
-        $("#stickerDuration").val(1);
+        $("#stickerHours").val("0");
+        $("#stickerMinutes").val("0");
         $("#stickerForm").slideUp(150);
       })
       .catch((error) => {
@@ -174,7 +190,7 @@ $(document).ready(function () {
       });
   });
 
-  // ---- Delete Event (ลบจาก Database Collection: events) ----
+  // ---- Delete Event (from Agenda) ----
   $("#eventList").on("click", ".btn-del", function () {
     let idToDelete = $(this).data("id").toString();
 
@@ -208,7 +224,7 @@ $(document).ready(function () {
     $("#dragPresetsSection").show();
   });
 
-  // ---- Delete Quick Sticker (ลบจาก Database Collection: stickers) ----
+  // ---- Delete Quick Sticker ----
   $(document).on("click", ".btn-del-sticker", function (e) {
     e.stopPropagation();
     let idToDelete = $(this).data("id").toString();
@@ -222,13 +238,31 @@ $(document).ready(function () {
         console.error("Error removing sticker: ", error);
       });
   });
+
+  // ---- Delete Event (from Timeline) ----
+  $(document).on("click", ".btn-del-timeline", function (e) {
+    e.stopPropagation();
+    let idToDelete = $(this).data("id").toString();
+
+    if (!confirm("Remove this event?")) return;
+
+    db.collection("events").doc(idToDelete).delete()
+      .then(() => {
+        appointments = appointments.filter(app => app.id !== idToDelete);
+        renderCalendar();
+        renderEventList();
+        showDayDetail(selectedDateStr);
+      })
+      .catch((error) => {
+        console.error("Error removing event: ", error);
+      });
+  });
 });
 
 // ============================================================
-//  LOAD DATA FROM SEPARATED DATABASE COLLECTIONS
+//  LOAD DATA
 // ============================================================
 function loadUserDataFromDatabase(userId) {
-  // 1. โหลดข้อมูลกิจกรรมเฉพาะของผู้ใช้คนนี้ จาก Collection 'events'
   db.collection("events")
     .where("userId", "==", userId)
     .get()
@@ -237,6 +271,7 @@ function loadUserDataFromDatabase(userId) {
       querySnapshot.forEach((doc) => {
         let eventData = doc.data();
         eventData.id = doc.id;
+        if (!eventData.color) eventData.color = "purple";
         appointments.push(eventData);
       });
       renderCalendar();
@@ -246,7 +281,6 @@ function loadUserDataFromDatabase(userId) {
       }
     });
 
-  // 2. โหลดข้อมูลสติกเกอร์เฉพาะของผู้ใช้คนนี้ จาก Collection 'stickers'
   db.collection("stickers")
     .where("userId", "==", userId)
     .get()
@@ -255,6 +289,7 @@ function loadUserDataFromDatabase(userId) {
       querySnapshot.forEach((doc) => {
         let stickerData = doc.data();
         stickerData.id = doc.id;
+        if (!stickerData.color) stickerData.color = "purple";
         quickStickers.push(stickerData);
       });
       renderQuickStickers();
@@ -273,8 +308,9 @@ function renderQuickStickers() {
   }
 
   quickStickers.forEach(sticker => {
+    let colorClass = "sticker-" + (sticker.color || "purple");
     let $chip = $(`
-      <div class="draggable-chip" data-title="${sticker.title}" data-duration="${sticker.duration}" data-details="${sticker.details || ''}">
+      <div class="draggable-chip ${colorClass}" data-title="${sticker.title}" data-duration="${sticker.duration}" data-details="${sticker.details || ''}" data-color="${sticker.color || 'purple'}">
         ${sticker.title} (${sticker.duration}h)
         <button class="btn-del-sticker" data-id="${sticker.id}" type="button" title="Remove sticker">×</button>
       </div>
@@ -316,9 +352,25 @@ function renderCalendar() {
 
     let cellClass = isToday ? "cell is-today" : "cell";
 
+    let dayEvents = appointments.filter(app => app.date === dateFormatted);
+    let dotsHtml = "";
+    
+    if (dayEvents.length > 0) {
+      dotsHtml = '<div class="event-dots">';
+      dayEvents.slice(0, 3).forEach(evt => {
+        let c = evt.color || "purple";
+        dotsHtml += `<span class="event-dot dot-${c}"></span>`;
+      });
+      if (dayEvents.length > 3) {
+        dotsHtml += `<span class="event-dot-more">+${dayEvents.length - 3}</span>`;
+      }
+      dotsHtml += '</div>';
+    }
+
     let $cell = $(
       `<div class="${cellClass}" data-date="${dateFormatted}">
          <span class="cell-num">${day}</span>
+         ${dotsHtml}
        </div>`
     );
     $container.append($cell);
@@ -337,36 +389,66 @@ function showDayDetail(dateStr) {
   $("#detailDayCircle").text(dayNum);
 
   let dayEvents = appointments.filter(app => app.date === dateStr);
+  
+  dayEvents.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
 
-  $(".time-content").empty();
+  $("#timelineGrid .event-sticker-block").remove();
   let $banner = $("#allDayBanner").empty();
 
   if (dayEvents.length > 0) {
+    let groups = [];
+    let currentGroup = [];
+
     dayEvents.forEach(evt => {
-      $banner.append(
-        `<div class="event-banner-item">${evt.title} (${evt.time} - ${evt.endTime})</div>`
-      );
+      let evtStart = timeToMinutes(evt.time);
+      let evtEnd = timeToMinutes(evt.endTime);
 
-      let [hStr, mStr] = evt.time.split(":");
-      let hour = parseInt(hStr, 10);
-      let minute = parseInt(mStr, 10);
+      if (currentGroup.length === 0) {
+        currentGroup.push({ evt, start: evtStart, end: evtEnd });
+      } else {
+        let lastInGroup = currentGroup[currentGroup.length - 1];
+        if (evtStart < lastInGroup.end) {
+          currentGroup.push({ evt, start: evtStart, end: evtEnd });
+        } else {
+          groups.push([...currentGroup]);
+          currentGroup = [{ evt, start: evtStart, end: evtEnd }];
+        }
+      }
+    });
+    if (currentGroup.length > 0) groups.push(currentGroup);
 
-      let slotIndex = hour * 2 + (minute >= 30 ? 1 : 0);
-      let $targetSlot = $(`#slot-half-${slotIndex}`);
+    groups.forEach(group => {
+      let groupSize = group.length;
+      
+      group.forEach((item, index) => {
+        let evt = item.evt;
+        let color = evt.color || "purple";
+        
+        $banner.append(
+          `<div class="event-banner-item banner-${color}">${evt.title} (${evt.time} - ${evt.endTime})</div>`
+        );
 
-      if ($targetSlot.length) {
-        let blockHeight = evt.duration * 70 - 4;
+        let minutesFromTop = item.start;
+        let durationMinutes = item.end - item.start;
+
+        let topPx = minutesFromTop * PX_PER_MINUTE;
+        let heightPx = durationMinutes * PX_PER_MINUTE;
+
+        let widthPercent = 100 / groupSize;
+        let leftPercent = widthPercent * index;
 
         let $sticker = $(`
-          <div class="event-sticker-block" style="height: ${blockHeight}px;">
+          <div class="event-sticker-block sticker-${color}" 
+               style="top: ${topPx}px; height: ${heightPx - 2}px; width: calc(${widthPercent}% - 6px); left: calc(${leftPercent}% + 4px);">
             <div class="sticker-title">${evt.title}</div>
             <div class="sticker-time">${evt.time} - ${evt.endTime}</div>
             ${evt.details ? `<div class="sticker-details">${evt.details}</div>` : ""}
+            <button class="btn-del-timeline" data-id="${evt.id}" type="button" title="Remove event">×</button>
           </div>
         `);
 
-        $targetSlot.append($sticker);
-      }
+        $("#timelineGrid").append($sticker);
+      });
     });
   } else {
     $banner.html(
@@ -412,7 +494,7 @@ function renderTimelineSlots() {
 }
 
 // ============================================================
-//  DRAG & DROP (Event Delegation)
+//  DRAG & DROP
 // ============================================================
 function initDraggablesAndDroppables() {
   $(document).on("mouseenter", ".draggable-chip", function () {
@@ -443,6 +525,7 @@ function initDraggablesAndDroppables() {
           let title = ui.draggable.data("title");
           let duration = parseFloat(ui.draggable.data("duration")) || 1;
           let details = ui.draggable.data("details") || "";
+          let color = ui.draggable.data("color") || "purple";
 
           let [h, m] = targetTimeStr.split(":");
           let formattedTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -462,10 +545,10 @@ function initDraggablesAndDroppables() {
             duration: duration,
             title: title,
             details: details,
+            color: color,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           };
 
-          // บันทึกการลากวางสติกเกอร์ลง Database Collection 'events' ทันที
           db.collection("events").add(newEventData)
             .then((docRef) => {
               newEventData.id = docRef.id;
@@ -508,11 +591,16 @@ function renderEventList() {
     let timeDisplay = app.endTime 
       ? `${app.time} - ${app.endTime}` 
       : `${app.time} (${app.duration}h)`;
+    
+    let color = app.color || "purple";
 
     let $item = $(`
       <li class="agenda-item">
         <div>
-          <span class="agenda-title">${app.title}</span>
+          <span class="agenda-title">
+            <span class="agenda-color-dot dot-${color}"></span>
+            ${app.title}
+          </span>
           <span class="agenda-meta">${app.date} · ${timeDisplay}</span>
         </div>
         <button class="btn-del" data-id="${app.id}" type="button">Remove</button>
@@ -523,18 +611,17 @@ function renderEventList() {
 }
 
 // ============================================================
-//  GOOGLE SIGN-IN & USERS COLLECTION MANAGEMENT
+//  GOOGLE SIGN-IN
 // ============================================================
 function handleCredentialResponse(response) {
   const payload = parseJwt(response.credential);
-  currentUserId = payload.sub; // ใช้ Google ID เป็น UID แยกข้อมูล
+  currentUserId = payload.sub;
 
   $("#loginContainer").hide();
   $("#userAvatar").attr("src", payload.picture);
   $("#userName").text(payload.name);
   $("#userInfo").css("display", "flex");
 
-  // บันทึก/อัปเดตข้อมูลผู้ใช้ลง Collection 'users' ใน Database
   db.collection("users").doc(currentUserId).set({
     uid: currentUserId,
     email: payload.email,
@@ -543,7 +630,6 @@ function handleCredentialResponse(response) {
     lastLogin: firebase.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
 
-  // โหลดข้อมูลแยกตามผู้ใช้นี้ (Events และ Stickers)
   loadUserDataFromDatabase(currentUserId);
 }
 
