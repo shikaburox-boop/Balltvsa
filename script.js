@@ -611,7 +611,7 @@ function renderQuickStickers() {
 }
 
 // ============================================================
-//  ✅ RENDER MONTH CALENDAR (Stacked & Connected Bars)
+//  ✅ RENDER MONTH CALENDAR (Absolute Position Multi-day Bar)
 // ============================================================
 function renderCalendar() {
   let year = currentDate.getFullYear();
@@ -625,64 +625,106 @@ function renderCalendar() {
   let $container = $("#daysContainer");
   $container.empty();
 
+  // 1. วาดช่องวันว่างก่อนวันแรก
   for (let i = 0; i < firstDay; i++) {
     $container.append('<div class="cell empty"></div>');
   }
 
+  // 2. วาดช่องวันปกติ
   let today = new Date();
-
   for (let day = 1; day <= daysInMonth; day++) {
     let monthStr = String(month + 1).padStart(2, "0");
     let dayStr = String(day).padStart(2, "0");
     let dateFormatted = `${year}-${monthStr}-${dayStr}`;
 
-    let isToday =
-      today.getFullYear() === year &&
-      today.getMonth() === month &&
-      today.getDate() === day;
-
+    let isToday = (today.getFullYear() === year && today.getMonth() === month && today.getDate() === day);
     let cellClass = isToday ? "cell is-today" : "cell";
-
-    let dayEvents = appointments.filter(app => {
-      let start = app.date;
-      let end = app.endDate || app.date;
-      return dateFormatted >= start && dateFormatted <= end;
-    });
-
-    let barsHtml = "";
-    if (dayEvents.length > 0) {
-      barsHtml = '<div class="event-stack">';
-      dayEvents.forEach(evt => {
-        let c = evt.color || "purple";
-        let start = evt.date;
-        let end = evt.endDate || evt.date;
-        
-        let classCap = "";
-        if (start === end) {
-           classCap = "single-cap";
-        } else if (dateFormatted === start) {
-           classCap = "start-cap";
-        } else if (dateFormatted === end) {
-           classCap = "end-cap";
-        }
-
-        barsHtml += `<div class="event-bar bar-${c} ${classCap}"></div>`;
-      });
-      barsHtml += '</div>';
-    }
 
     let $cell = $(
       `<div class="${cellClass}" data-date="${dateFormatted}">
          <span class="cell-num">${day}</span>
-         ${barsHtml}
        </div>`
     );
     $container.append($cell);
   }
+
+  // 3. วาดช่องวันว่างหลังวันสุดท้าย (เพื่อให้ Grid ครบสัปดาห์)
+  let totalCells = firstDay + daysInMonth;
+  let remainingCells = (7 - (totalCells % 7)) % 7;
+  for (let i = 0; i < remainingCells; i++) {
+    $container.append('<div class="cell empty"></div>');
+  }
+
+  // 4. วาดแท่ง Events แบบ Absolute Position (คำนวณจาก Grid)
+  setTimeout(() => {
+    // หาตำแหน่ง X ของแต่ละวันใน Grid
+    let cellWidth = $(".cell:not(.empty)").first().outerWidth();
+    let cellHeight = $(".cell:not(.empty)").first().outerHeight();
+    
+    // ลบแท่งเดิมออกก่อน
+    $(".month-event-bar").remove();
+
+    let eventsByRow = {}; // จัดกลุ่ม Events ตามสัปดาห์ (Row)
+
+    appointments.forEach(evt => {
+      let start = new Date(evt.date + "T00:00:00");
+      let end = new Date((evt.endDate || evt.date) + "T00:00:00");
+
+      let monthStart = new Date(year, month, 1);
+      let monthEnd = new Date(year, month + 1, 0);
+
+      let displayStart = start < monthStart ? monthStart : start;
+      let displayEnd = end > monthEnd ? monthEnd : end;
+
+      if (displayStart > displayEnd) return; 
+
+      // หาตำแหน่ง Row (สัปดาห์) ของวันเริ่มและวันจบ (อิงจากวันที่ 1 ของเดือน)
+      let startRow = Math.floor((displayStart.getDate() + firstDay - 1) / 7);
+      let endRow = Math.floor((displayEnd.getDate() + firstDay - 1) / 7);
+
+      for (let row = startRow; row <= endRow; row++) {
+        let rowStartCol = (row === startRow) ? displayStart.getDay() : 0;
+        let rowEndCol = (row === endRow) ? displayEnd.getDay() : 6;
+
+        // คำนวณ Width และ Left (อ้างอิงจาก Grid 7 คอลัมน์)
+        let leftPx = rowStartCol * cellWidth;
+        let widthPx = (rowEndCol - rowStartCol + 1) * cellWidth;
+
+        // เผื่อระยะ Padding ซ้าย-ขวา
+        let paddingPx = 6;
+        leftPx += paddingPx;
+        widthPx -= (paddingPx * 2);
+
+        // คำนวณ Top (เว้นที่ให้ตัวเลขวันที่)
+        let topPx = (row * cellHeight) + 32; 
+
+        if (!eventsByRow[row]) eventsByRow[row] = [];
+        let stackIndex = eventsByRow[row].length;
+        
+        // ถ้ามีหลาย Event ในสัปดาห์เดียวกัน ให้ซ้อนลงมา
+        topPx += (stackIndex * 12); 
+
+        // สร้างแท่งสี
+        let colorClass = "bar-" + (evt.color || "purple");
+        let $bar = $(`<div class="month-event-bar ${colorClass}" style="left: ${leftPx}px; top: ${topPx}px; width: ${widthPx}px;"></div>`);
+        
+        // เพิ่มความโค้งที่หัวและท้าย
+        if (row === startRow && rowStartCol === displayStart.getDay()) {
+           $bar.css("border-top-left-radius", "4px").css("border-bottom-left-radius", "4px");
+        }
+        if (row === endRow && rowEndCol === displayEnd.getDay()) {
+           $bar.css("border-top-right-radius", "4px").css("border-bottom-right-radius", "4px");
+        }
+
+        $(".days-grid").append($bar);
+        eventsByRow[row].push(evt);
+      }
+    });
+  }, 50);
 }
 
 // ============================================================
-//  ✅ DAY DETAIL VIEW (แก้บัคซ้อนทับ & ระยะห่าง)
+//  ✅ DAY DETAIL VIEW (แก้บัคซ้อนทับ)
 // ============================================================
 function showDayDetail(dateStr) {
   let dateObj = new Date(dateStr + "T00:00:00");
@@ -748,7 +790,7 @@ function showDayDetail(dateStr) {
         let widthPercent = 100 / groupSize;
         let leftPercent = widthPercent * index;
 
-        // ดันไปทางขวา 74px (70px Label + 4px padding) และลบความกว้าง 80px 
+        // ดันไปทางขวา 74px และลบความกว้าง 80px
         let $sticker = $(`
           <div class="event-sticker-block sticker-${color}" 
                style="top: ${topPx}px; height: ${heightPx - 2}px; width: calc(${widthPercent}% - 78px); left: calc(${leftPercent}% + 74px);">
