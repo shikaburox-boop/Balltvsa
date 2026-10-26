@@ -32,10 +32,16 @@ const dayNamesTh = ["อาทิตย์", "จันทร์", "อังค
 const SLOT_HEIGHT_PX = 70;
 const PX_PER_MINUTE = SLOT_HEIGHT_PX / 60;
 
+// ✅ Helper Functions
 function timeToMinutes(timeStr) {
   if (!timeStr) return 0;
   let [h, m] = timeStr.split(":").map(Number);
   return h * 60 + m;
+}
+
+const availableColors = ["purple", "blue", "green", "orange", "red"];
+function getRandomColor() {
+  return availableColors[Math.floor(Math.random() * availableColors.length)];
 }
 
 // ============================================================
@@ -89,7 +95,9 @@ $(document).ready(function () {
     let endTimeVal = $("#eventEndTime").val() || "10:00";
     let titleVal = $("#eventTitle").val().trim();
     let detailsVal = $("#eventDetails").val().trim();
-    let colorVal = $("#eventColor").val() || "purple";
+    
+    // ✅ อ่านค่าสีจาก Radio Button
+    let colorVal = $("input[name='eventColor']:checked").val();
 
     if (!titleVal) return;
 
@@ -100,6 +108,11 @@ $(document).ready(function () {
     if (durationVal <= 0) {
       alert("End time must be later than start time.");
       return;
+    }
+
+    // ✅ ถ้าไม่ได้เลือกสี ให้ Random สี
+    if (!colorVal) {
+      colorVal = getRandomColor();
     }
 
     let newEventData = {
@@ -140,7 +153,7 @@ $(document).ready(function () {
     $("#stickerTitle").focus();
   });
 
-  // ---- Mini Form: Create Quick Sticker (ใช้ Dropdown ชั่วโมง/นาที) ----
+  // ---- Mini Form: Create Quick Sticker ----
   $("#stickerForm").submit(function (e) {
     e.preventDefault();
 
@@ -156,12 +169,18 @@ $(document).ready(function () {
     let minutes = parseInt($("#stickerMinutes").val()) || 0;
     let duration = hours + (minutes / 60);
 
-    let color = $("#stickerColor").val() || "purple";
+    // ✅ อ่านค่าสีจาก Radio Button
+    let color = $("input[name='stickerColor']:checked").val();
 
     if (!title) return;
     if (duration <= 0) {
       alert("Duration must be greater than 0.");
       return;
+    }
+
+    // ✅ ถ้าไม่ได้เลือกสี ให้ Random สี
+    if (!color) {
+      color = getRandomColor();
     }
 
     let newStickerData = {
@@ -239,8 +258,8 @@ $(document).ready(function () {
       });
   });
 
-  // ---- Delete Event (from Timeline) ----
-  $(document).on("click", ".btn-del-timeline", function (e) {
+  // ---- Delete Event (from Timeline or Banner) ----
+  $(document).on("click", ".btn-del-banner, .btn-del-timeline", function (e) {
     e.stopPropagation();
     let idToDelete = $(this).data("id").toString();
 
@@ -353,24 +372,24 @@ function renderCalendar() {
     let cellClass = isToday ? "cell is-today" : "cell";
 
     let dayEvents = appointments.filter(app => app.date === dateFormatted);
-    let dotsHtml = "";
+    let dashesHtml = "";
     
     if (dayEvents.length > 0) {
-      dotsHtml = '<div class="event-dots">';
+      dashesHtml = '<div class="event-dots">';
       dayEvents.slice(0, 3).forEach(evt => {
         let c = evt.color || "purple";
-        dotsHtml += `<span class="event-dot dot-${c}"></span>`;
+        dashesHtml += `<span class="event-dash dash-${c}"></span>`;
       });
       if (dayEvents.length > 3) {
-        dotsHtml += `<span class="event-dot-more">+${dayEvents.length - 3}</span>`;
+        dashesHtml += `<span class="event-dash-more">+${dayEvents.length - 3}</span>`;
       }
-      dotsHtml += '</div>';
+      dashesHtml += '</div>';
     }
 
     let $cell = $(
       `<div class="${cellClass}" data-date="${dateFormatted}">
          <span class="cell-num">${day}</span>
-         ${dotsHtml}
+         ${dashesHtml}
        </div>`
     );
     $container.append($cell);
@@ -425,7 +444,10 @@ function showDayDetail(dateStr) {
         let color = evt.color || "purple";
         
         $banner.append(
-          `<div class="event-banner-item banner-${color}">${evt.title} (${evt.time} - ${evt.endTime})</div>`
+          `<div class="event-banner-item banner-${color}">
+             ${evt.title} (${evt.time} - ${evt.endTime})
+             <button class="btn-del-banner" data-id="${evt.id}" type="button" title="Remove event">×</button>
+           </div>`
         );
 
         let minutesFromTop = item.start;
@@ -439,7 +461,7 @@ function showDayDetail(dateStr) {
 
         let $sticker = $(`
           <div class="event-sticker-block sticker-${color}" 
-               style="top: ${topPx}px; height: ${heightPx - 2}px; width: calc(${widthPercent}% - 6px); left: calc(${leftPercent}% + 4px);">
+               style="top: ${topPx}px; height: ${heightPx - 2}px; width: calc(${widthPercent}% - 80px); left: calc(${leftPercent}% + 74px);">
             <div class="sticker-title">${evt.title}</div>
             <div class="sticker-time">${evt.time} - ${evt.endTime}</div>
             ${evt.details ? `<div class="sticker-details">${evt.details}</div>` : ""}
