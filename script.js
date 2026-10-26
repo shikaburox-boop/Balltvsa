@@ -32,7 +32,7 @@ const dayNamesTh = ["อาทิตย์", "จันทร์", "อังค
 const SLOT_HEIGHT_PX = 70;
 const PX_PER_MINUTE = SLOT_HEIGHT_PX / 60;
 
-// ✅ Helper Functions
+// Helper Functions
 function timeToMinutes(timeStr) {
   if (!timeStr) return 0;
   let [h, m] = timeStr.split(":").map(Number);
@@ -49,7 +49,7 @@ function getRandomColor() {
 // ============================================================
 $(document).ready(function () {
   renderCalendar();
-  renderEventList();
+  renderAgendaList();
   renderTimelineSlots();
   renderQuickStickers();
   initDraggablesAndDroppables();
@@ -69,7 +69,6 @@ $(document).ready(function () {
   $("#backToMonthBtn").click(function () {
     $("#dayDetailView").hide();
     $("#monthView").fadeIn(150);
-
     selectedDateStr = "";
     $("#eventDate").val("");
     $("#dragPresetsSection").hide();
@@ -86,8 +85,15 @@ $(document).ready(function () {
     }
 
     let dateVal = $("#eventDate").val();
+    let endDateVal = $("#eventEndDate").val() || dateVal;
+
     if (!dateVal) {
       alert("Please select a specific day from the calendar first.");
+      return;
+    }
+
+    if (endDateVal < dateVal) {
+      alert("End Date cannot be before Start Date.");
       return;
     }
 
@@ -96,7 +102,6 @@ $(document).ready(function () {
     let titleVal = $("#eventTitle").val().trim();
     let detailsVal = $("#eventDetails").val().trim();
     
-    // ✅ อ่านค่าสีจาก Radio Button
     let colorVal = $("input[name='eventColor']:checked").val();
 
     if (!titleVal) return;
@@ -110,14 +115,12 @@ $(document).ready(function () {
       return;
     }
 
-    // ✅ ถ้าไม่ได้เลือกสี ให้ Random สี
-    if (!colorVal) {
-      colorVal = getRandomColor();
-    }
+    if (!colorVal) colorVal = getRandomColor();
 
     let newEventData = {
       userId: currentUserId,
       date: dateVal,
+      endDate: endDateVal,
       time: startTimeVal,
       endTime: endTimeVal,
       duration: durationVal,
@@ -136,7 +139,7 @@ $(document).ready(function () {
         $("#eventDetails").val("");
 
         renderCalendar();
-        renderEventList();
+        renderAgendaList();
 
         if ($("#dayDetailView").is(":visible") && selectedDateStr === dateVal) {
           showDayDetail(selectedDateStr);
@@ -169,7 +172,6 @@ $(document).ready(function () {
     let minutes = parseInt($("#stickerMinutes").val()) || 0;
     let duration = hours + (minutes / 60);
 
-    // ✅ อ่านค่าสีจาก Radio Button
     let color = $("input[name='stickerColor']:checked").val();
 
     if (!title) return;
@@ -178,10 +180,7 @@ $(document).ready(function () {
       return;
     }
 
-    // ✅ ถ้าไม่ได้เลือกสี ให้ Random สี
-    if (!color) {
-      color = getRandomColor();
-    }
+    if (!color) color = getRandomColor();
 
     let newStickerData = {
       userId: currentUserId,
@@ -210,7 +209,7 @@ $(document).ready(function () {
   });
 
   // ---- Delete Event (from Agenda) ----
-  $("#eventList").on("click", ".btn-del", function () {
+  $(".agenda-list").on("click", ".btn-del", function () {
     let idToDelete = $(this).data("id").toString();
 
     db.collection("events").doc(idToDelete).delete()
@@ -219,7 +218,7 @@ $(document).ready(function () {
 
         $(this).closest(".agenda-item").fadeOut(150, function () {
           renderCalendar();
-          renderEventList();
+          renderAgendaList();
           if ($("#dayDetailView").is(":visible")) {
             showDayDetail(selectedDateStr);
           }
@@ -235,6 +234,7 @@ $(document).ready(function () {
     let dateStr = $(this).data("date");
     selectedDateStr = dateStr;
     $("#eventDate").val(dateStr);
+    $("#eventEndDate").val(dateStr);
 
     showDayDetail(dateStr);
 
@@ -269,12 +269,216 @@ $(document).ready(function () {
       .then(() => {
         appointments = appointments.filter(app => app.id !== idToDelete);
         renderCalendar();
-        renderEventList();
+        renderAgendaList();
         showDayDetail(selectedDateStr);
       })
       .catch((error) => {
         console.error("Error removing event: ", error);
       });
+  });
+
+  // ==========================================================
+  // ✅ CUSTOM DATE PICKER LOGIC
+  // ==========================================================
+  let dpCurrentDate = new Date();
+  let dpTargetInputId = null;
+
+  function renderDpCalendar() {
+    let year = dpCurrentDate.getFullYear();
+    let month = dpCurrentDate.getMonth();
+    
+    $("#dpMonthYear").text(`${monthNames[month]} ${year}`);
+
+    let firstDay = new Date(year, month, 1).getDay();
+    let daysInMonth = new Date(year, month + 1, 0).getDate();
+    let $daysContainer = $("#dpDays").empty();
+
+    for (let i = 0; i < firstDay; i++) {
+      $daysContainer.append('<div class="dp-day dp-empty"></div>');
+    }
+
+    let today = new Date();
+    let selectedVal = dpTargetInputId ? $(dpTargetInputId).val() : "";
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      let mStr = String(month + 1).padStart(2, '0');
+      let dStr = String(day).padStart(2, '0');
+      let dateStr = `${year}-${mStr}-${dStr}`;
+      
+      let isSelected = (dateStr === selectedVal) ? "dp-selected" : "";
+      let isToday = (today.getFullYear() === year && today.getMonth() === month && today.getDate() === day) ? "dp-today" : "";
+      let isSunday = (new Date(year, month, day).getDay() === 0) ? "dp-sunday" : "";
+
+      let $dayDiv = $(`<div class="dp-day ${isSelected} ${isToday} ${isSunday}" data-date="${dateStr}">${day}</div>`);
+      $daysContainer.append($dayDiv);
+    }
+  }
+
+  $(document).on("click", "#eventDate, #eventEndDate", function(e) {
+    e.preventDefault();
+    dpTargetInputId = "#" + $(this).attr("id");
+    
+    let currentVal = $(this).val();
+    if (currentVal) {
+      dpCurrentDate = new Date(currentVal + "T00:00:00");
+    } else {
+      dpCurrentDate = new Date();
+    }
+
+    renderDpCalendar();
+    $("#datePickerModal").css("display", "flex");
+  });
+
+  $(".dp-overlay").click(function() {
+    $("#datePickerModal").hide();
+  });
+
+  $(document).on("click", ".dp-day:not(.dp-empty)", function() {
+    let selectedDate = $(this).data("date");
+    if (dpTargetInputId) {
+      $(dpTargetInputId).val(selectedDate);
+    }
+    $("#datePickerModal").hide();
+  });
+
+  $(".dp-prev").click(function(e) {
+    e.stopPropagation();
+    dpCurrentDate.setMonth(dpCurrentDate.getMonth() - 1);
+    renderDpCalendar();
+  });
+
+  $(".dp-next").click(function(e) {
+    e.stopPropagation();
+    dpCurrentDate.setMonth(dpCurrentDate.getMonth() + 1);
+    renderDpCalendar();
+  });
+
+  // ==========================================================
+  // ✅ CUSTOM TIME PICKER LOGIC
+  // ==========================================================
+  let tpTargetInputId = null;
+
+  function populateHours() {
+    let $wheel = $("#wheelHour");
+    $wheel.find(".tp-wheel-item").remove();
+    for (let i = 1; i <= 12; i++) {
+      let val = String(i).padStart(2, '0');
+      $wheel.find(".tp-wheel-spacer").eq(1).before(`<div class="tp-wheel-item" data-val="${val}">${val}</div>`);
+    }
+  }
+
+  function populateMinutes() {
+    let $wheel = $("#wheelMinute");
+    $wheel.find(".tp-wheel-item").remove();
+    for (let i = 0; i < 60; i++) {
+      let val = String(i).padStart(2, '0');
+      $wheel.find(".tp-wheel-spacer").eq(1).before(`<div class="tp-wheel-item" data-val="${val}">${val}</div>`);
+    }
+  }
+
+  populateHours();
+  populateMinutes();
+
+  function scrollToValue($wheel, value) {
+    let $item = $wheel.find(`.tp-wheel-item[data-val="${value}"]`);
+    if ($item.length) {
+      let scrollPos = $item.index() * 40; 
+      $wheel.scrollTop(scrollPos);
+    }
+  }
+
+  function updateWheelHighlight($wheel, displayId, isAmPm) {
+    let scrollTop = $wheel.scrollTop();
+    let index = Math.round(scrollTop / 40); 
+    let $items = $wheel.find(".tp-wheel-item");
+    
+    $items.removeClass("tp-active");
+    let $active = $items.eq(index);
+    $active.addClass("tp-active");
+
+    let val = $active.data("val");
+    if (val) {
+      $(displayId).text(val);
+    }
+  }
+
+  $(document).on("click", "#eventStartTime, #eventEndTime", function(e) {
+    e.preventDefault();
+    tpTargetInputId = "#" + $(this).attr("id");
+    
+    let currentVal = $(this).val(); 
+    let h = "09", m = "00", ampm = "AM";
+    
+    if (currentVal) {
+      let parts = currentVal.split(":");
+      let hour24 = parseInt(parts[0], 10);
+      m = parts[1];
+      
+      if (hour24 >= 12) {
+        ampm = "PM";
+        if (hour24 > 12) hour24 -= 12;
+      } else {
+        ampm = "AM";
+        if (hour24 === 0) hour24 = 12;
+      }
+      h = String(hour24).padStart(2, '0');
+    } else {
+      h = "09"; m = "00"; ampm = "AM";
+    }
+
+    $("#tpHourDisplay").text(h);
+    $("#tpMinDisplay").text(m);
+    $("#tpAmPmDisplay").text(ampm);
+
+    setTimeout(() => {
+      scrollToValue($("#wheelHour"), h);
+      scrollToValue($("#wheelMinute"), m);
+      scrollToValue($("#wheelAmPm"), ampm);
+    }, 50); 
+
+    $("#timePickerModal").css("display", "flex");
+  });
+
+  $(".tp-overlay").click(function() {
+    $("#timePickerModal").hide();
+  });
+
+  $(".tp-wheel").scroll(function() {
+    let scrollTop = $(this).scrollTop();
+    let index = Math.round(scrollTop / 40);
+    let $items = $(this).find(".tp-wheel-item");
+    
+    $items.removeClass("tp-active");
+    let $active = $items.eq(index);
+    $active.addClass("tp-active");
+
+    let val = $active.data("val");
+    if ($(this).attr("id") === "wheelHour") {
+      $("#tpHourDisplay").text(val);
+    } else if ($(this).attr("id") === "wheelMinute") {
+      $("#tpMinDisplay").text(val);
+    } else if ($(this).attr("id") === "wheelAmPm") {
+      $("#tpAmPmDisplay").text(val);
+    }
+  });
+
+  // กดปุ่ม OK (หรือคลิกพื้นหลังเพื่อบันทึก)
+  $(".tp-overlay").click(function() {
+    let h = $("#tpHourDisplay").text();
+    let m = $("#tpMinDisplay").text();
+    let ampm = $("#tpAmPmDisplay").text();
+
+    let hour24 = parseInt(h, 10);
+    if (ampm === "PM" && hour24 !== 12) hour24 += 12;
+    if (ampm === "AM" && hour24 === 12) hour24 = 0;
+
+    let finalTime = `${String(hour24).padStart(2, '0')}:${m}`;
+    
+    if (tpTargetInputId) {
+      $(tpTargetInputId).val(finalTime);
+    }
+
+    $("#timePickerModal").hide();
   });
 });
 
@@ -291,10 +495,11 @@ function loadUserDataFromDatabase(userId) {
         let eventData = doc.data();
         eventData.id = doc.id;
         if (!eventData.color) eventData.color = "purple";
+        if (!eventData.endDate) eventData.endDate = eventData.date;
         appointments.push(eventData);
       });
       renderCalendar();
-      renderEventList();
+      renderAgendaList();
       if ($("#dayDetailView").is(":visible") && selectedDateStr) {
         showDayDetail(selectedDateStr);
       }
@@ -313,6 +518,76 @@ function loadUserDataFromDatabase(userId) {
       });
       renderQuickStickers();
     });
+}
+
+// ============================================================
+//  RENDER AGENDA LIST (Ongoing & Upcoming)
+// ============================================================
+function renderAgendaList() {
+  let $ongoingList = $("#ongoingList").empty();
+  let $upcomingList = $("#upcomingList").empty();
+
+  let now = new Date();
+  
+  appointments.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+
+  let ongoingEvents = [];
+  let upcomingEvents = [];
+
+  appointments.forEach(app => {
+    let startDateTime = new Date(`${app.date}T${app.time}`);
+    let endDateTime = new Date(`${app.endDate}T${app.endTime}`);
+
+    if (now >= startDateTime && now <= endDateTime) {
+      ongoingEvents.push(app);
+    } else if (now < startDateTime) {
+      upcomingEvents.push(app);
+    }
+  });
+
+  $("#ongoingCount").text(ongoingEvents.length);
+  $("#upcomingCount").text(upcomingEvents.length);
+
+  if (ongoingEvents.length === 0) {
+    $ongoingList.append('<li class="agenda-item" style="color: var(--text-muted); font-size: 0.8rem;">No ongoing events</li>');
+  } else {
+    ongoingEvents.forEach(app => {
+      $ongoingList.append(createAgendaItemHtml(app, true));
+    });
+  }
+
+  if (upcomingEvents.length === 0) {
+    $upcomingList.append('<li class="agenda-item" style="color: var(--text-muted); font-size: 0.8rem;">No upcoming events</li>');
+  } else {
+    upcomingEvents.forEach(app => {
+      $upcomingList.append(createAgendaItemHtml(app, false));
+    });
+  }
+}
+
+function createAgendaItemHtml(app, isOngoing) {
+  let color = app.color || "purple";
+  let dateDisplay = app.date;
+  if (app.endDate && app.endDate !== app.date) {
+    dateDisplay = `${app.date} to ${app.endDate}`;
+  }
+  
+  let timeDisplay = isOngoing 
+    ? `<span style="color: var(--color-green); font-weight:600;">Now</span> · ends ${app.endTime}`
+    : `${app.time} - ${app.endTime}`;
+
+  return `
+    <li class="agenda-item">
+      <div>
+        <span class="agenda-title">
+          <span class="agenda-color-dot dot-${color}"></span>
+          ${app.title}
+        </span>
+        <span class="agenda-meta">${dateDisplay} · ${timeDisplay}</span>
+      </div>
+      <button class="btn-del" data-id="${app.id}" type="button">Remove</button>
+    </li>
+  `;
 }
 
 // ============================================================
@@ -339,7 +614,7 @@ function renderQuickStickers() {
 }
 
 // ============================================================
-//  RENDER MONTH CALENDAR
+//  RENDER MONTH CALENDAR (Multi-day bar)
 // ============================================================
 function renderCalendar() {
   let year = currentDate.getFullYear();
@@ -371,14 +646,30 @@ function renderCalendar() {
 
     let cellClass = isToday ? "cell is-today" : "cell";
 
-    let dayEvents = appointments.filter(app => app.date === dateFormatted);
+    let dayEvents = appointments.filter(app => {
+      let start = app.date;
+      let end = app.endDate || app.date;
+      return dateFormatted >= start && dateFormatted <= end;
+    });
+
     let dashesHtml = "";
-    
     if (dayEvents.length > 0) {
       dashesHtml = '<div class="event-dots">';
       dayEvents.slice(0, 3).forEach(evt => {
         let c = evt.color || "purple";
-        dashesHtml += `<span class="event-dash dash-${c}"></span>`;
+        let start = evt.date;
+        let end = evt.endDate || evt.date;
+        
+        let classCap = "";
+        if (start === end) {
+           classCap = "single-cap";
+        } else if (dateFormatted === start) {
+           classCap = "start-cap";
+        } else if (dateFormatted === end) {
+           classCap = "end-cap";
+        }
+
+        dashesHtml += `<div class="event-dash-container"><div class="event-dash dash-${c} ${classCap}"></div></div>`;
       });
       if (dayEvents.length > 3) {
         dashesHtml += `<span class="event-dash-more">+${dayEvents.length - 3}</span>`;
@@ -407,7 +698,11 @@ function showDayDetail(dateStr) {
   $("#detailDayName").text(dayOfWeek);
   $("#detailDayCircle").text(dayNum);
 
-  let dayEvents = appointments.filter(app => app.date === dateStr);
+  let dayEvents = appointments.filter(app => {
+    let start = app.date;
+    let end = app.endDate || app.date;
+    return dateStr >= start && dateStr <= end;
+  });
   
   dayEvents.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
 
@@ -562,6 +857,7 @@ function initDraggablesAndDroppables() {
           let newEventData = {
             userId: currentUserId,
             date: selectedDateStr,
+            endDate: selectedDateStr,
             time: formattedTime,
             endTime: formattedEndTime,
             duration: duration,
@@ -577,7 +873,7 @@ function initDraggablesAndDroppables() {
               appointments.push(newEventData);
 
               renderCalendar();
-              renderEventList();
+              renderAgendaList();
               showDayDetail(selectedDateStr);
             })
             .catch((error) => {
@@ -586,49 +882,6 @@ function initDraggablesAndDroppables() {
         }
       });
     }
-  });
-}
-
-// ============================================================
-//  AGENDA LIST
-// ============================================================
-function renderEventList() {
-  let $list = $("#eventList");
-  $list.empty();
-
-  $("#eventCount").text(appointments.length);
-
-  if (appointments.length === 0) {
-    $list.append(
-      '<li class="agenda-item" style="color: var(--text-muted); font-size: 0.8rem;">No upcoming events</li>'
-    );
-    return;
-  }
-
-  appointments.sort(
-    (a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`)
-  );
-
-  appointments.forEach(app => {
-    let timeDisplay = app.endTime 
-      ? `${app.time} - ${app.endTime}` 
-      : `${app.time} (${app.duration}h)`;
-    
-    let color = app.color || "purple";
-
-    let $item = $(`
-      <li class="agenda-item">
-        <div>
-          <span class="agenda-title">
-            <span class="agenda-color-dot dot-${color}"></span>
-            ${app.title}
-          </span>
-          <span class="agenda-meta">${app.date} · ${timeDisplay}</span>
-        </div>
-        <button class="btn-del" data-id="${app.id}" type="button">Remove</button>
-      </li>
-    `);
-    $list.append($item);
   });
 }
 
@@ -678,7 +931,7 @@ $(document).on("click", "#logoutBtn", function () {
   appointments = [];
   quickStickers = [];
   renderCalendar();
-  renderEventList();
+  renderAgendaList();
   renderQuickStickers();
   $("#dragPresetsSection").hide();
 });
